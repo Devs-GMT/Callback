@@ -1,0 +1,452 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   Callback — design tokens
+   Sampled from the UI direction in PRD §9 (warm / editorial / premium).
+   Dark "espresso" sections alternate with near-white light sections.
+   ========================================================================== */
+
+@theme {
+  /* --- Espresso (dark sections) ------------------------------------------ */
+  --color-espresso: #1c1009; /* dark section background */
+  --color-espresso-card: #231710; /* card on a dark section */
+  --color-espresso-card-raised: #261912; /* raised card on a dark section */
+  --color-espresso-btn: #210900; /* primary button fill on light sections */
+  --color-espresso-line: #35241b; /* hairline on dark */
+
+  /* --- Light sections ---------------------------------------------------- */
+  --color-cream: #fcfcfc; /* light page background */
+  --color-sand: #f7f5f4; /* soft card on light */
+  --color-stone: #e8e0da; /* warm stone panel */
+  --color-line: #e7e2df; /* hairline on light */
+
+  /* --- Text -------------------------------------------------------------- */
+  --color-ink: #171210; /* headline text on light */
+  --color-muted: #746b68; /* muted body text */
+  --color-muted-dark: #a79b95; /* muted body text on espresso */
+
+  /* --- Accent ------------------------------------------------------------ */
+  --color-lilac: #c0a1f7; /* collage shapes, torn paper, highlights */
+  --color-lilac-soft: #ece1ff;
+
+  /* --- Status (reused as match states: matched / partial / missing) ------ */
+  --color-mint: #c6e6d3;
+  --color-mint-ink: #2b6347;
+  --color-yellow: #f7e6b0;
+  --color-yellow-ink: #74570f;
+  --color-coral: #f6c9bf;
+  --color-coral-ink: #8c3828;
+  --color-peach: #f6ded5; /* pink-peach panel */
+
+  /* --- Type -------------------------------------------------------------- */
+  --font-serif: var(--font-newsreader), ui-serif, Georgia, serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-script: var(--font-caveat), ui-serif, cursive;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* --- Motion ------------------------------------------------------------ */
+  --ease-editorial: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* --- Radii -------------------------------------------------------------
+     PRD §9: buttons are small rectangles with ~4px radius. Photo cards and
+     dark panels use a much larger radius. Keep the scale explicit so corner
+     radius stays a hierarchy signal rather than a default. */
+  --radius-btn: 4px;
+  --radius-card: 10px;
+  --radius-panel: 28px;
+  --radius-photo: 24px;
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+
+  body {
+    background-color: var(--color-cream);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* PRD §9: headlines in a refined serif, regular weight, tight leading. */
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-serif);
+    font-weight: 400;
+    letter-spacing: -0.015em;
+    line-height: 1.08;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* A single visible focus treatment, legible on both section colours. */
+  :focus-visible {
+    outline: 2px solid var(--color-lilac);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  ::selection {
+    background-color: var(--color-lilac-soft);
+    color: var(--color-ink);
+  }
+
+  /* Reserve the scrollbar so dark/light section edges don't shift on route
+     changes between a scrolling and a non-scrolling page. */
+  html {
+    scrollbar-gutter: stable;
+  }
+}
+
+/* ==========================================================================
+   Components — the small set of repeated primitives from PRD §9
+   ========================================================================== */
+
+@layer components {
+  /* Tiny grey label above section text ("ATS CHECK"). PRD §9 type rules. */
+  .eyebrow {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+
+  .eyebrow-on-dark {
+    color: var(--color-muted-dark);
+  }
+
+  /* Fluid serif display sizes. PRD §9 asks for ~40–56px headlines; these
+     scale down to a readable size at 320px without a separate mobile rule. */
+  .display-1 {
+    font-size: clamp(2.5rem, 1.6rem + 4.2vw, 4.25rem);
+  }
+
+  .display-2 {
+    font-size: clamp(2rem, 1.4rem + 2.8vw, 3.25rem);
+  }
+
+  .display-3 {
+    font-size: clamp(1.5rem, 1.2rem + 1.4vw, 2.125rem);
+  }
+
+  /* Sections alternate between espresso and near-white. */
+  .section-dark {
+    background-color: var(--color-espresso);
+    color: #ffffff;
+  }
+
+  .section-light {
+    background-color: var(--color-cream);
+    color: var(--color-ink);
+  }
+
+  .shell {
+    width: 100%;
+    max-width: 1240px;
+    margin-inline: auto;
+    padding-inline: 20px;
+  }
+
+  @media (min-width: 768px) {
+    .shell {
+      padding-inline: 32px;
+    }
+  }
+}
+
+/* ==========================================================================
+   Utilities
+   ========================================================================== */
+
+@utility hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Faint hand-drawn UI sketch lines over the hero photo (PRD §10 §1). */
+@utility sketch-stroke {
+  stroke: rgba(255, 255, 255, 0.5);
+  stroke-width: 1.25;
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+/* ==========================================================================
+   Motion & texture layer
+   Everything below is decorative. Each animated rule has a reduced-motion
+   fallback at the end of this block that leaves the element in its final,
+   readable state.
+   ========================================================================== */
+
+@theme {
+  --animate-float-slow: float-slow 7s ease-in-out infinite;
+  --animate-float-slower: float-slow 9s ease-in-out -3s infinite;
+  --animate-spin-slow: spin 28s linear infinite;
+  --animate-pulse-ring: pulse-ring 2.4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  --animate-shimmer: shimmer 2.2s linear infinite;
+  --animate-scan: scan 2.6s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  --animate-ring: ring 2.8s ease-in-out infinite;
+}
+
+@keyframes float-slow {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(var(--float-rotate, 0deg));
+  }
+  50% {
+    transform: translate3d(0, -12px, 0) rotate(calc(var(--float-rotate, 0deg) * -1));
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes scan {
+  0% {
+    transform: translateY(-10%);
+    opacity: 0;
+  }
+  15%,
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(1000%);
+    opacity: 0;
+  }
+}
+
+/* The handset's little wobble: still most of the time, then a short ring. */
+@keyframes ring {
+  0%,
+  70%,
+  100% {
+    transform: rotate(0deg);
+  }
+  73% {
+    transform: rotate(-9deg);
+  }
+  76% {
+    transform: rotate(8deg);
+  }
+  79% {
+    transform: rotate(-7deg);
+  }
+  82% {
+    transform: rotate(6deg);
+  }
+  85% {
+    transform: rotate(-3deg);
+  }
+  88% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-100%, 0, 0);
+  }
+}
+
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@layer components {
+  .marquee-track {
+    animation: marquee var(--marquee-duration, 38s) linear infinite;
+  }
+
+  .marquee:hover .marquee-track {
+    animation-play-state: paused;
+  }
+
+  /* Fades both ends of a marquee into its background. */
+  .marquee-fade {
+    mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+  }
+
+  /* Film grain over dark panels: an inline SVG turbulence tile, so there is
+     no image request and it stays sharp at any pixel density. */
+  .grain {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0.09;
+    mix-blend-mode: overlay;
+    border-radius: inherit;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+
+  /* A warm grade so stock photography sits inside the espresso palette:
+     slightly desaturated, warmed, with contrast pulled back a touch. */
+  .photo-warm {
+    filter: saturate(0.72) sepia(0.18) contrast(1.04) brightness(0.96);
+  }
+
+  .photo-mono {
+    filter: grayscale(1) contrast(1.08) brightness(1.04);
+  }
+
+  /* For objects shot on white: pushes the backdrop to pure white so a
+     multiply blend drops it out completely, leaving only the object. */
+  .photo-cutout {
+    filter: grayscale(1) contrast(1.4) brightness(1.18);
+  }
+
+  /* Hand-drawn strokes that draw themselves on once the parent is shown. */
+  .sketch-draw path,
+  .sketch-draw rect,
+  .sketch-draw circle {
+    stroke-dasharray: 600;
+    stroke-dashoffset: 600;
+    animation: draw 2.4s var(--ease-editorial) forwards;
+    animation-delay: calc(0.9s + var(--i, 0) * 0.18s);
+  }
+
+  /* A placeholder sheen for loading surfaces. */
+  .shimmer {
+    background-image: linear-gradient(
+      90deg,
+      rgba(23, 18, 16, 0.05) 0%,
+      rgba(23, 18, 16, 0.11) 50%,
+      rgba(23, 18, 16, 0.05) 100%
+    );
+    background-size: 200% 100%;
+    animation: var(--animate-shimmer);
+  }
+
+  /* The soft dotted paper texture used behind the app's work area. */
+  .paper-dots {
+    background-image: radial-gradient(rgba(23, 18, 16, 0.07) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+
+  /* A lilac-to-peach glow, used sparingly behind hero objects. */
+  .glow-lilac {
+    background: radial-gradient(
+      closest-side,
+      rgba(192, 161, 247, 0.55),
+      rgba(246, 222, 213, 0.18) 60%,
+      transparent
+    );
+  }
+
+  /* Hand-drawn underline under one word of a headline. */
+  .scribble-underline {
+    position: relative;
+    white-space: nowrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track,
+  .shimmer,
+  [class*="animate-"] {
+    animation: none !important;
+  }
+
+  .sketch-draw path,
+  .sketch-draw rect,
+  .sketch-draw circle {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Smooth open/close for the FAQ's native <details>, where supported. Browsers
+   without ::details-content simply open instantly, as before. */
+:root {
+  interpolate-size: allow-keywords;
+}
+
+.faq-item::details-content {
+  block-size: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    block-size 0.5s var(--ease-editorial),
+    opacity 0.4s ease,
+    content-visibility 0.5s allow-discrete;
+}
+
+.faq-item[open]::details-content {
+  block-size: auto;
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .faq-item::details-content {
+    transition: none;
+  }
+}
+
+/* The logo's returning arrow spins once when the wordmark is hovered. */
+.logo-spin {
+  transform-origin: 16px 16px;
+  transform-box: view-box;
+  transition: transform 0.9s var(--ease-editorial);
+}
+
+.group\/logo:hover .logo-spin {
+  transform: rotate(-360deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo-spin {
+    transition: none;
+  }
+}

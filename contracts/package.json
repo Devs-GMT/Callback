@@ -1,0 +1,17 @@
+{
+  "name": "callback-contracts",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Callback.sol for BOT Chain. Kept as its own package so the Vercel build never installs a Solidity toolchain.",
+  "scripts": {
+    "build": "hardhat compile",
+    "test": "hardhat test"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox-mocha-ethers": "^4.0.0",
+    "ethers": "^6.17.0",
+    "hardhat": "^3.21.2",
+    "typescript": "^5.9.3"
+  }
+}
