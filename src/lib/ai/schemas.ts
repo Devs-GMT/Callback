@@ -53,10 +53,19 @@ const SUGGESTION_KINDS = [
 /* JSON Schema for the provider                                               */
 /* -------------------------------------------------------------------------- */
 
-// No `maxItems` here. Gemini compiles the schema into a decoding state machine
-// and every array bound multiplies its states; with several bounded arrays of
-// enum-bearing objects it rejects the schema outright ("too many states for
-// serving"). The prompts state the counts, and `capped` below enforces them.
+// No `maxItems` and no `enum` here. Gemini compiles the schema into a decoding
+// state machine; array bounds and enums inside arrays of objects multiply its
+// states, and past a limit it rejects the schema outright ("too many states
+// for serving") — for long CVs this happened often. Allowed values go in the
+// field's `description` instead, which costs no states, and the Zod layer
+// below maps anything unexpected to a safe fallback. The prompts state the
+// counts, and `capped` enforces them.
+
+/** A string limited to `values` by instruction rather than by the decoder. */
+const oneOf = (values: readonly string[]) => ({
+  type: "string",
+  description: `Exactly one of: ${values.join(", ")}.`,
+});
 
 export const ANALYZE_JSON_SCHEMA = {
   type: "object",
@@ -68,8 +77,8 @@ export const ANALYZE_JSON_SCHEMA = {
         properties: {
           id: { type: "string" },
           text: { type: "string" },
-          type: { type: "string", enum: [...REQUIREMENT_TYPES] },
-          category: { type: "string", enum: [...REQUIREMENT_CATEGORIES] },
+          type: oneOf(REQUIREMENT_TYPES),
+          category: oneOf(REQUIREMENT_CATEGORIES),
         },
         required: ["id", "text", "type", "category"],
       },
@@ -80,7 +89,7 @@ export const ANALYZE_JSON_SCHEMA = {
         type: "object",
         properties: {
           requirementId: { type: "string" },
-          status: { type: "string", enum: [...MATCH_STATUSES] },
+          status: oneOf(MATCH_STATUSES),
           evidence: { type: "string" },
           note: { type: "string" },
         },
@@ -93,7 +102,7 @@ export const ANALYZE_JSON_SCHEMA = {
       items: {
         type: "object",
         properties: {
-          kind: { type: "string", enum: [...RED_FLAG_KINDS] },
+          kind: oneOf(RED_FLAG_KINDS),
           text: { type: "string" },
         },
         required: ["kind", "text"],
@@ -102,8 +111,8 @@ export const ANALYZE_JSON_SCHEMA = {
     seniority: {
       type: "object",
       properties: {
-        jobLevel: { type: "string", enum: [...SENIORITY_LEVELS] },
-        cvLevel: { type: "string", enum: [...SENIORITY_LEVELS] },
+        jobLevel: oneOf(SENIORITY_LEVELS),
+        cvLevel: oneOf(SENIORITY_LEVELS),
         note: { type: "string" },
       },
       required: ["jobLevel", "cvLevel", "note"],
@@ -143,7 +152,7 @@ export const PIVOT_JSON_SCHEMA = {
         type: "object",
         properties: {
           id: { type: "string" },
-          kind: { type: "string", enum: [...SUGGESTION_KINDS] },
+          kind: oneOf(SUGGESTION_KINDS),
           title: { type: "string" },
           before: { type: "string" },
           after: { type: "string" },
@@ -201,6 +210,12 @@ const capped = <T extends z.ZodTypeAny>(item: T, max: number) =>
     .catch([])
     .transform((list) => list.slice(0, max));
 
+/** One of `values`, forgiving case and stray spaces now the decoder no longer enforces it. */
+const choice = <const T extends readonly [string, ...string[]]>(values: T, fallback: T[number]) =>
+  z
+    .preprocess((value) => (typeof value === "string" ? value.trim().toLowerCase() : value), z.enum(values))
+    .catch(fallback);
+
 const text = (fallback = "") =>
   z
     .string()
@@ -210,19 +225,19 @@ const text = (fallback = "") =>
 const requirementSchema = z.object({
   id: z.string().min(1),
   text: z.string().min(1).transform((v) => v.trim()),
-  type: z.enum(REQUIREMENT_TYPES).catch("nice"),
-  category: z.enum(REQUIREMENT_CATEGORIES).catch("skill"),
+  type: choice(REQUIREMENT_TYPES, "nice"),
+  category: choice(REQUIREMENT_CATEGORIES, "skill"),
 });
 
 const matchSchema = z.object({
   requirementId: z.string().min(1),
-  status: z.enum(MATCH_STATUSES).catch("missing"),
+  status: choice(MATCH_STATUSES, "missing"),
   evidence: text(),
   note: text(),
 });
 
 const redFlagSchema = z.object({
-  kind: z.enum(RED_FLAG_KINDS).catch("other"),
+  kind: choice(RED_FLAG_KINDS, "other"),
   text: z.string().min(1).transform((v) => v.trim()),
 });
 
@@ -241,8 +256,8 @@ export const analyzeResponseSchema = z.object({
   redFlags: capped(redFlagSchema, MAX.redFlags),
   seniority: z
     .object({
-      jobLevel: z.enum(SENIORITY_LEVELS).catch("unknown"),
-      cvLevel: z.enum(SENIORITY_LEVELS).catch("unknown"),
+      jobLevel: choice(SENIORITY_LEVELS, "unknown"),
+      cvLevel: choice(SENIORITY_LEVELS, "unknown"),
       note: text(),
     })
     .catch({ jobLevel: "unknown", cvLevel: "unknown", note: "" }),
@@ -262,7 +277,7 @@ export const analyzeResponseSchema = z.object({
 
 const suggestionSchema = z.object({
   id: z.string().min(1),
-  kind: z.enum(SUGGESTION_KINDS).catch("gap"),
+  kind: choice(SUGGESTION_KINDS, "gap"),
   title: z.string().min(1).transform((v) => v.trim()),
   before: text().optional(),
   after: text().optional(),

@@ -131,6 +131,15 @@ function retryAfterOf(error: unknown): number | undefined {
   return undefined;
 }
 
+/** The provider rejected the response schema itself, not the request. */
+function isSchemaRejection(error: unknown): boolean {
+  return (
+    statusOf(error) === 400 &&
+    error instanceof Error &&
+    /too many states|schema/i.test(error.message)
+  );
+}
+
 /**
  * Strip a ```json fence if the model adds one despite the schema. Cheap
  * insurance: a single stray fence should not lose the user their analysis.
@@ -155,18 +164,20 @@ export async function generateJson<T = unknown>(
 ): Promise<T> {
   const ai = getClient();
 
-  let raw: string;
-  try {
-    const response = await ai.interactions.create(
+  const call = (constrained: boolean) =>
+    ai.interactions.create(
       {
         model: options.model ?? MODELS.analyze,
-        system_instruction: options.system,
+        system_instruction: constrained
+          ? options.system
+          : `${options.system}
+
+Return one JSON object that conforms to this JSON Schema:
+${JSON.stringify(options.schema)}`,
         input: options.prompt,
-        response_format: {
-          type: "text",
-          mime_type: "application/json",
-          schema: options.schema,
-        },
+        response_format: constrained
+          ? { type: "text", mime_type: "application/json", schema: options.schema }
+          : { type: "text", mime_type: "application/json" },
         generation_config: {
           temperature: options.temperature ?? 0.1,
           thinking_level: options.thinking ?? THINKING.analyze,
@@ -177,6 +188,19 @@ export async function generateJson<T = unknown>(
       options.signal ? { signal: options.signal } : undefined,
     );
 
+  let raw: string;
+  try {
+    let response;
+    try {
+      response = await call(true);
+    } catch (error) {
+      // Gemini sometimes refuses to compile a schema it accepted before ("too
+      // many states for serving"). The schema is a convenience, not a
+      // guarantee — Zod validates the answer either way — so ask once more
+      // with the schema written into the instructions instead.
+      if (!isSchemaRejection(error)) throw error;
+      response = await call(false);
+    }
     raw = response.output_text ?? "";
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
