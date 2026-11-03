@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, Check, Eye, EyeOff, Pencil, X } from "lucide-react";
-import { cleanHeading, type CvSection } from "@/lib/analysis/cv-layout";
+import { ArrowDown, ArrowUp, Check, Eye, EyeOff, Pencil, Plus, X } from "lucide-react";
+import { SECTION_PRESETS, cleanHeading, type CvSection } from "@/lib/analysis/cv-layout";
+import { sectionKeyOf, type SectionKey } from "@/lib/analysis/text";
 import { cn } from "@/lib/utils";
 
 /**
@@ -18,17 +19,23 @@ export function SectionsPanel({
   onMove,
   onRename,
   onToggleHidden,
+  onAdd,
 }: {
   sections: CvSection[];
   hidden: readonly string[];
   onMove: (from: number, to: number) => void;
   onRename: (index: number, heading: string) => void;
   onToggleHidden: (heading: string) => void;
+  /** Add a section; `body` is the skeleton the editor selects to type over. */
+  onAdd: (heading: string, body?: string) => void;
 }) {
   const [renaming, setRenaming] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [custom, setCustom] = useState("");
 
-  if (sections.length === 0) return null;
+  const present = new Set(sections.map((section) => section.heading));
+  const presets = SECTION_PRESETS.filter((preset) => !present.has(preset.heading));
 
   const save = (index: number) => {
     if (cleanHeading(draft)) onRename(index, draft);
@@ -83,6 +90,7 @@ export function SectionsPanel({
                   >
                     {section.heading}
                   </span>
+                  <ReadAs sectionKey={sectionKeyOf(section.heading)} />
                   <IconButton
                     label={`Rename ${section.heading}`}
                     onClick={() => {
@@ -123,10 +131,97 @@ export function SectionsPanel({
           );
         })}
       </ol>
+      <div className="mt-2">
+        {adding ? (
+          <div className="flex flex-col gap-3 rounded-[6px] bg-sand/60 p-3 ring-1 ring-line">
+            <div className="flex flex-wrap gap-1.5">
+              {presets.map((preset) => (
+                <button
+                  key={preset.heading}
+                  type="button"
+                  onClick={() => {
+                    onAdd(preset.heading, preset.body);
+                    setAdding(false);
+                  }}
+                  className="min-h-9 rounded-full bg-white px-3 text-[12px] font-medium text-ink ring-1 ring-line transition-colors hover:ring-espresso/40 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-espresso-btn"
+                >
+                  {preset.heading.charAt(0) + preset.heading.slice(1).toLowerCase()}
+                </button>
+              ))}
+            </div>
+            <form
+              className="flex items-center gap-1.5"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (!cleanHeading(custom)) return;
+                onAdd(custom);
+                setCustom("");
+                setAdding(false);
+              }}
+            >
+              <label className="sr-only" htmlFor="custom-section">
+                Your own section name
+              </label>
+              <input
+                id="custom-section"
+                value={custom}
+                maxLength={48}
+                onChange={(event) => setCustom(event.target.value)}
+                placeholder="Or name your own, e.g. Publications"
+                className="h-9 min-w-0 flex-1 rounded-[4px] border border-line bg-white px-2.5 text-[12.5px] focus:border-espresso/50 focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={!cleanHeading(custom)}
+                className="h-9 rounded-[4px] bg-espresso-btn px-3 text-[12px] font-medium text-white disabled:opacity-40"
+              >
+                Add
+              </button>
+              <IconButton label="Close" onClick={() => setAdding(false)}>
+                <X className="size-3.5" aria-hidden="true" />
+              </IconButton>
+            </form>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-[4px] px-2 text-[12.5px] font-medium text-ink hover:bg-sand focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-espresso-btn"
+          >
+            <Plus className="size-3.5" aria-hidden="true" />
+            Add section
+          </button>
+        )}
+      </div>
+
       <p className="mt-2 text-[11.5px] leading-relaxed text-muted">
+        <span className="font-medium text-ink">Read as</span> shows how an ATS files each section:
+        Experience, Education and Skills count towards the score; anything else is an extra section.
         Hidden sections stay in your text but are left out of the preview, the downloads and the re-check.
       </p>
     </fieldset>
+  );
+}
+
+const READ_AS: Record<SectionKey, string> = {
+  experience: "Experience",
+  education: "Education",
+  skills: "Skills",
+  summary: "Summary",
+};
+
+/** How the ATS check files this heading. */
+function ReadAs({ sectionKey }: { sectionKey?: SectionKey }) {
+  return (
+    <span
+      title={sectionKey ? `Read as ${READ_AS[sectionKey]}` : "An extra section"}
+      className={cn(
+        "hidden shrink-0 rounded-full px-2 py-0.5 text-[11px] sm:inline",
+        sectionKey ? "bg-mint/50 text-mint-ink" : "bg-sand text-muted",
+      )}
+    >
+      {sectionKey ? READ_AS[sectionKey] : "Extra"}
+    </span>
   );
 }
 

@@ -68,7 +68,7 @@ export type CvLayout = {
 };
 
 const SECTION_NAMES =
-  "summary|professional\\s+summary|profile|professional\\s+profile|about\\s+me|objective|career\\s+objective|personal\\s+statement|experience|work\\s+experience|professional\\s+experience|relevant\\s+experience|employment(?:\\s+history)?|work\\s+history|career\\s+history|education|academic\\s+background|qualifications|skills|key\\s+skills|technical\\s+skills|core\\s+competenc(?:y|ies)|competencies|technologies|tech\\s+stack|projects|certifications?|licen[cs]es(?:\\s+(?:and|&)\\s+certifications)?|languages|interests|hobbies|references|awards|achievements|publications|volunteering|volunteer\\s+experience|training|courses";
+  "summary|professional\\s+summary|profile|professional\\s+profile|about\\s+me|objective|career\\s+objective|personal\\s+statement|experience|work\\s+experience|professional\\s+experience|relevant\\s+experience|employment(?:\\s+history)?|work\\s+history|career\\s+history|education|academic\\s+background|qualifications|skills|key\\s+skills|technical\\s+skills|core\\s+competenc(?:y|ies)|competencies|technologies|tech\\s+stack|projects|certifications?|licen[cs]es(?:\\s+(?:and|&)\\s+certifications)?|languages|interests|hobbies|references|awards|achievements|publications|volunteering|volunteer\\s+experience|training|courses|organi[sz]ations?|organi[sz]ational\\s+experience|leadership(?:\\s+(?:and|&)\\s+activities)?|activities|extracurricular(?:\\s+activities)?|volunteer(?:ing)?|honou?rs(?:\\s+(?:and|&)\\s+awards)?|awards(?:\\s+(?:and|&)\\s+achievements)?|certificates|portfolio|ringkasan|profil|tentang\\s+saya|pengalaman(?:\\s+(?:kerja|kerja\\s+profesional|organisasi|magang))?|riwayat\\s+pekerjaan|pendidikan|riwayat\\s+pendidikan|keahlian|keterampilan|kemampuan|proyek|projek|sertifikasi|sertifikat|pelatihan|kursus|organisasi|penghargaan|prestasi|bahasa|minat|referensi|publikasi|kegiatan|aktivitas";
 
 /** A line that is only a known section name, optionally with a colon. */
 const KNOWN_HEADING = new RegExp(`^(?:${SECTION_NAMES})\\s*:?\\s*$`, "i");
@@ -471,4 +471,79 @@ export function renameSection(text: string, index: number, heading: string): str
 export function withoutSections(layout: CvLayout, hidden: readonly string[]): CvLayout {
   if (hidden.length === 0) return layout;
   return { ...layout, sections: layout.sections.filter((section) => !hidden.includes(section.heading)) };
+}
+
+/** Ready-made sections, each with a skeleton to type over. */
+export const SECTION_PRESETS: Array<{ heading: string; body: string }> = [
+  {
+    heading: "PROJECTS",
+    body: "Project name | Tools used | Jan 2025 – Mar 2025\n• What you built, how, and the result — with a number if you have one",
+  },
+  { heading: "CERTIFICATIONS", body: "Certificate name | Issuer | 2025" },
+  {
+    heading: "ORGANIZATIONS",
+    body: "Your role | Organization name | Jan 2024 – Present\n• What you did and what changed because of it",
+  },
+  { heading: "AWARDS", body: "Award or placing | Who gave it | 2025" },
+  {
+    heading: "VOLUNTEERING",
+    body: "Your role | Organization name | Jan 2024 – Present\n• What you did and who it helped",
+  },
+  { heading: "LANGUAGES", body: "English (Professional working) • Indonesian (Native)" },
+  { heading: "COURSES", body: "Course name | Provider | 2025" },
+];
+
+/**
+ * Add a section at the end of the CV. Returns the new text and the range of
+ * the section's body, so the editor can select the skeleton to type over.
+ */
+export function addSection(
+  text: string,
+  heading: string,
+  body = "Write this section here",
+): { value: string; start: number; end: number } | undefined {
+  const clean = cleanHeading(heading);
+  if (!clean) return undefined;
+  const head = text.trimEnd();
+  const prefix = `${head}${head ? "\n\n" : ""}${clean}\n`;
+  return { value: `${prefix}${body}\n`, start: prefix.length, end: prefix.length + body.length };
+}
+
+const titleCase = (value: string) =>
+  value.toLowerCase().replace(/(^|[\s/&-])(\p{L})/gu, (_, gap: string, letter: string) => gap + letter.toUpperCase());
+
+/**
+ * The editor's Heading command: the line under the cursor becomes a section
+ * heading (capitals, own paragraph), or back into ordinary text if it is one.
+ */
+export function toggleHeading(
+  value: string,
+  start: number,
+): { value: string; start: number; end: number } | undefined {
+  const lineStart = value.lastIndexOf("\n", start - 1) + 1;
+  const nextBreak = value.indexOf("\n", start);
+  const lineEnd = nextBreak === -1 ? value.length : nextBreak;
+  const line = value.slice(lineStart, lineEnd);
+  if (line.trim().length === 0) return undefined;
+
+  if (isHeading(line) && !BULLET_MARKER.test(line)) {
+    const plain = titleCase(stripInline(line).trim());
+    return {
+      value: value.slice(0, lineStart) + plain + value.slice(lineEnd),
+      start: lineStart,
+      end: lineStart + plain.length,
+    };
+  }
+
+  const heading = cleanHeading(line.replace(BULLET_MARKER, ""));
+  if (!heading) return undefined;
+  // A blank line above makes it its own block, as headings are on most CVs.
+  const before = value.slice(0, lineStart);
+  const gap = before.length > 0 && !before.endsWith("\n\n") ? "\n" : "";
+  const from = lineStart + gap.length;
+  return {
+    value: before + gap + heading + value.slice(lineEnd),
+    start: from,
+    end: from + heading.length,
+  };
 }

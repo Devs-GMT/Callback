@@ -9,7 +9,15 @@ import {
   toggleBullets,
   toggleMarker,
 } from "@/lib/analysis/inline";
-import { layoutText, moveSection, renameSection, withoutSections } from "@/lib/analysis/cv-layout";
+import {
+  addSection,
+  layoutText,
+  moveSection,
+  renameSection,
+  toggleHeading,
+  withoutSections,
+} from "@/lib/analysis/cv-layout";
+import { sectionKeyOf } from "@/lib/analysis/text";
 
 describe("parseInline", () => {
   it("reads bold, italic and links, and leaves the rest as text", () => {
@@ -110,5 +118,44 @@ BSc Computer Science, 2020`;
   it("leaves hidden sections out of the layout", () => {
     const layout = withoutSections(layoutText(CV), ["SKILLS"]);
     assert.deepEqual(layout.sections.map((s) => s.heading), ["EXPERIENCE", "EDUCATION"]);
+  });
+});
+
+describe("new sections", () => {
+  const CV = "Jane Doe\njane@example.com\n\nEXPERIENCE\nEngineer | Acme | 2021 - 2024\n• Built things";
+
+  it("adds a section at the end with its skeleton selected", () => {
+    const added = addSection(CV, "Projects", "Project name | Tools | 2025");
+    assert.ok(added);
+    assert.equal(added.value.slice(added.start, added.end), "Project name | Tools | 2025");
+    assert.deepEqual(layoutText(added.value).sections.map((s) => s.heading), ["EXPERIENCE", "PROJECTS"]);
+  });
+
+  it("turns the line under the cursor into a heading, and back", () => {
+    const value = `${CV}\nVolunteering\nTaught kids to code | Code Club | 2023`;
+    const at = value.indexOf("Volunteering") + 3;
+    const on = toggleHeading(value, at);
+    assert.ok(on);
+    assert.deepEqual(layoutText(on.value).sections.map((s) => s.heading), ["EXPERIENCE", "VOLUNTEERING"]);
+    const off = toggleHeading(on.value, on.start);
+    assert.ok(off?.value.includes("\nVolunteering\n"));
+  });
+
+  it("refuses to make a long sentence a heading", () => {
+    assert.equal(toggleHeading("Built a billing service used by forty thousand customers every month", 3), undefined);
+  });
+
+  it("files English and Indonesian headings for the ATS", () => {
+    assert.equal(sectionKeyOf("PROFESSIONAL EXPERIENCE"), "experience");
+    assert.equal(sectionKeyOf("PENGALAMAN KERJA"), "experience");
+    assert.equal(sectionKeyOf("PENDIDIKAN"), "education");
+    assert.equal(sectionKeyOf("KEAHLIAN"), "skills");
+    assert.equal(sectionKeyOf("RINGKASAN"), "summary");
+    assert.equal(sectionKeyOf("PROJECTS"), undefined);
+  });
+
+  it("reads Indonesian headings as sections in the layout", () => {
+    const layout = layoutText("Budi Santoso\nbudi@example.com\nPENGALAMAN KERJA\n• Membangun API\nORGANISASI\n• Ketua himpunan");
+    assert.deepEqual(layout.sections.map((s) => s.heading), ["PENGALAMAN KERJA", "ORGANISASI"]);
   });
 });

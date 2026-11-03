@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { Bold, Italic, Link2, List } from "lucide-react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Bold, Heading, Italic, Link2, List } from "lucide-react";
+import { toggleHeading } from "@/lib/analysis/cv-layout";
 import { insertLink, safeHref, toggleBullets, toggleMarker } from "@/lib/analysis/inline";
 import { LIMITS } from "@/lib/config";
 import { cn } from "@/lib/utils";
@@ -15,10 +16,31 @@ import { cn } from "@/lib/utils";
  * keeps the browser's own undo (Ctrl+Z) working; where that is unavailable
  * the value is set directly.
  */
-export function CvEditor({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+export function CvEditor({
+  value,
+  onChange,
+  initialSelection,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  /** Text to select when the editor opens, such as a new section's skeleton. */
+  initialSelection?: { start: number; end: number } | null;
+}) {
   const area = useRef<HTMLTextAreaElement>(null);
   const [linking, setLinking] = useState<{ start: number; end: number } | null>(null);
   const [url, setUrl] = useState("");
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    const el = area.current;
+    if (!el || !initialSelection) return;
+    el.focus();
+    el.setSelectionRange(initialSelection.start, initialSelection.end);
+    // Bring the selection into view: scroll to the line it starts on.
+    const line = el.value.slice(0, initialSelection.start).split("\n").length;
+    const lineHeight = Number.parseFloat(getComputedStyle(el).lineHeight) || 20;
+    el.scrollTop = Math.max(0, (line - 3) * lineHeight);
+  }, [initialSelection]);
 
   /** Put `next` in the box, changing only what differs, then select a range. */
   const apply = (next: { value: string; start: number; end: number }) => {
@@ -57,6 +79,18 @@ export function CvEditor({ value, onChange }: { value: string; onChange: (value:
   const bullets = () => {
     const s = selection();
     if (s) apply(toggleBullets(s.value, s.start, s.end));
+  };
+
+  const heading = () => {
+    const s = selection();
+    if (!s) return;
+    const next = toggleHeading(s.value, s.start);
+    if (next) {
+      setNotice(null);
+      apply(next);
+    } else {
+      setNotice("Put the cursor on a short line (under 48 characters) to make it a heading.");
+    }
   };
 
   const startLink = () => {
@@ -108,6 +142,9 @@ export function CvEditor({ value, onChange }: { value: string; onChange: (value:
         <ToolButton label="Bullet list" onClick={bullets}>
           <List className="size-3.5" aria-hidden="true" />
         </ToolButton>
+        <ToolButton label="Section heading — make this line a new section" onClick={heading}>
+          <Heading className="size-3.5" aria-hidden="true" />
+        </ToolButton>
 
         {linking ? (
           <form
@@ -149,6 +186,12 @@ export function CvEditor({ value, onChange }: { value: string; onChange: (value:
         )}
       </div>
 
+      {notice ? (
+        <p role="status" className="rounded-[4px] bg-yellow/50 px-3 py-2 text-[12px] text-yellow-ink">
+          {notice}
+        </p>
+      ) : null}
+
       <label className="sr-only" htmlFor="cv-editor">
         Your improved CV
       </label>
@@ -170,7 +213,7 @@ export function CvEditor({ value, onChange }: { value: string; onChange: (value:
       <p className="flex flex-wrap justify-between gap-2 text-[11.5px] text-muted">
         <span>
           <code>**bold**</code> · <code>*italic*</code> · <code>[text](link)</code> · a line starting with{" "}
-          <code>•</code> is a bullet
+          <code>•</code> is a bullet · a short line in CAPITALS is a section heading
         </span>
         <span className={over ? "text-coral-ink" : undefined}>
           {value.length.toLocaleString("en")} / {LIMITS.cvChars.toLocaleString("en")}

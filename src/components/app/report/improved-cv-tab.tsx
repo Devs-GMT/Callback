@@ -12,6 +12,7 @@ import {
   layoutToText,
   moveSection,
   renameSection,
+  addSection,
   cleanHeading,
   withoutSections,
 } from "@/lib/analysis/cv-layout";
@@ -120,6 +121,17 @@ export function ImprovedCvTab({
     if (!before || !after || before === after) return;
     editText(renameSection(text, index, heading));
     if (hidden.includes(before)) onHiddenChange(hidden.map((h) => (h === before ? after : h)));
+  };
+
+  /** Where the editor's selection starts when it opens on a new section. */
+  const [selectOnOpen, setSelectOnOpen] = useState<{ start: number; end: number } | null>(null);
+
+  const add = (heading: string, body?: string) => {
+    const next = addSection(text, heading, body);
+    if (!next) return;
+    editText(next.value);
+    setSelectOnOpen({ start: next.start, end: next.end });
+    setEditing(true);
   };
 
   const toggleHidden = (heading: string) =>
@@ -292,6 +304,7 @@ export function ImprovedCvTab({
                 onMove={moveTo}
                 onRename={rename}
                 onToggleHidden={toggleHidden}
+                onAdd={add}
               />
             </div>
           </div>
@@ -299,7 +312,7 @@ export function ImprovedCvTab({
 
         <div className="bg-sand/60 p-3 sm:p-6">
           {editing ? (
-            <CvEditor value={text} onChange={setManual} />
+            <CvEditor value={text} onChange={setManual} initialSelection={selectOnOpen} />
           ) : (
             <CvPage layout={shown} style={style} />
           )}

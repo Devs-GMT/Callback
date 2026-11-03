@@ -64,14 +64,24 @@ export type SectionKey = "experience" | "education" | "skills" | "summary";
 
 const SECTION_PATTERNS: Record<SectionKey, RegExp> = {
   experience:
-    /\b(work\s+experience|professional\s+experience|experience|employment(\s+history)?|work\s+history|career\s+history|relevant\s+experience)\b/i,
+    /\b(work\s+experience|professional\s+experience|experience|employment(\s+history)?|work\s+history|career\s+history|relevant\s+experience|pengalaman(\s+kerja)?|riwayat\s+pekerjaan)\b/i,
   education:
-    /\b(education|academic(\s+background)?|qualifications|educational\s+background)\b/i,
+    /\b(education|academic(\s+background)?|qualifications|educational\s+background|pendidikan|riwayat\s+pendidikan)\b/i,
   skills:
-    /\b(skills|technical\s+skills|core\s+competenc(?:y|ies)|competencies|technologies|tech\s+stack|key\s+skills)\b/i,
+    /\b(skills|technical\s+skills|core\s+competenc(?:y|ies)|competencies|technologies|tech\s+stack|key\s+skills|keahlian|keterampilan|kemampuan)\b/i,
   summary:
-    /\b(summary|professional\s+summary|profile|about\s+me|objective|career\s+objective|personal\s+statement)\b/i,
+    /\b(summary|professional\s+summary|profile|about\s+me|objective|career\s+objective|personal\s+statement|ringkasan|profil|tentang\s+saya)\b/i,
 };
+
+/**
+ * Which standard section a heading counts as for the ATS check, or undefined
+ * for an extra section such as Projects or Awards. Experience is tested first
+ * so "Professional Experience" is never read as a profile.
+ */
+export function sectionKeyOf(heading: string): SectionKey | undefined {
+  const order: SectionKey[] = ["experience", "education", "skills", "summary"];
+  return order.find((key) => SECTION_PATTERNS[key].test(heading));
+}
 
 /**
  * Which standard CV sections are present. A heading match is strong evidence;
