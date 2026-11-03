@@ -8,117 +8,122 @@
  * standard font is the most machine-readable thing Word can hold.
  *
  * That also means the exported CV scores full marks on the formatting check if
- * the user re-imports it, which is the point.
+ * the user re-imports it, which is the point. The structure itself (name,
+ * contact line, sections) comes from `layoutCv`.
  */
 
-import type { CvSegment } from "@/lib/analysis/apply";
-
-const SUMMARY_OR_SECTION =
-  /^(summary|professional\s+summary|profile|about\s+me|objective|career\s+objective|personal\s+statement|experience|work\s+experience|professional\s+experience|employment(\s+history)?|work\s+history|education|skills|technical\s+skills|core\s+competenc(?:y|ies)|competencies|projects|certifications?|languages|interests|references|awards|publications|volunteering)\s*:?\s*$/i;
-
-const BULLET_MARKER = /^\s*(?:[-–—•·*▪◦‣]|\d{1,2}[.)])\s+/;
-
-/** Does this line read as a section heading? */
-function isHeading(line: string): boolean {
-  const trimmed = line.trim();
-  if (trimmed.length === 0 || trimmed.length > 48) return false;
-  if (BULLET_MARKER.test(line)) return false;
-  if (SUMMARY_OR_SECTION.test(trimmed)) return true;
-
-  // An all-caps short line with no sentence punctuation is a heading too.
-  const letters = trimmed.replace(/[^\p{L}]/gu, "");
-  return (
-    letters.length >= 3 &&
-    letters === letters.toUpperCase() &&
-    !/[.!?,;]$/.test(trimmed)
-  );
-}
+import type { CvLayout } from "@/lib/analysis/cv-layout";
 
 export type CvDocxOptions = {
-  /** Used for the document title and the first line. */
+  /** Used for the document title. */
   name?: string;
 };
 
+const FONT = "Calibri";
+/** Sizes are in half-points. */
+const SIZE = { name: 32, heading: 22, body: 21, contact: 19 } as const;
+
 /**
  * Build the .docx and hand it back as a Blob.
+ *
+ * Section dividers are a bottom border on the heading paragraph rather than a
+ * drawn line or a table: a paragraph border is plain formatting that every
+ * parser skips, while shapes and tables are exactly what trips ATS reading.
  *
  * `docx` is imported dynamically: it is a sizeable dependency that only
  * matters the moment someone clicks download, and it has no business in the
  * initial bundle of a page most visitors will only read.
  */
 export async function buildCvDocx(
-  segments: CvSegment[],
+  layout: CvLayout,
   options: CvDocxOptions = {},
 ): Promise<Blob> {
-  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } =
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, BorderStyle } =
     await import("docx");
 
   const children: InstanceType<typeof Paragraph>[] = [];
 
-  for (const segment of segments) {
-    const line = segment.text;
-    const trimmed = line.trim();
-
-    if (trimmed.length === 0) {
-      children.push(new Paragraph({ text: "", spacing: { after: 80 } }));
-      continue;
-    }
-
-    if (isHeading(trimmed)) {
-      children.push(
-        new Paragraph({
-          heading: HeadingLevel.HEADING_2,
-          spacing: { before: 220, after: 90 },
-          children: [
-            new TextRun({
-              text: trimmed.replace(/:$/, ""),
-              bold: true,
-              size: 24, // half-points, so 12pt
-              font: "Calibri",
-            }),
-          ],
-        }),
-      );
-      continue;
-    }
-
-    if (BULLET_MARKER.test(line)) {
-      children.push(
-        new Paragraph({
-          // A real Word list rather than a literal bullet character, which is
-          // what a parser expects to find.
-          bullet: { level: 0 },
-          spacing: { after: 70 },
-          children: [
-            new TextRun({
-              text: line.replace(BULLET_MARKER, "").trim(),
-              size: 21, // 10.5pt
-              font: "Calibri",
-            }),
-          ],
-        }),
-      );
-      continue;
-    }
-
+  if (layout.name) {
     children.push(
       new Paragraph({
+        heading: HeadingLevel.TITLE,
         alignment: AlignmentType.LEFT,
-        spacing: { after: 80 },
-        children: [new TextRun({ text: trimmed, size: 21, font: "Calibri" })],
+        spacing: { after: 60 },
+        children: [
+          new TextRun({ text: layout.name.text, bold: true, size: SIZE.name, font: FONT, color: "111111" }),
+        ],
       }),
     );
   }
 
+  for (const line of layout.contact) {
+    children.push(
+      new Paragraph({
+        spacing: { after: 40 },
+        children: [new TextRun({ text: line.text, size: SIZE.contact, font: FONT, color: "444444" })],
+      }),
+    );
+  }
+
+  for (const section of layout.sections) {
+    children.push(
+      new Paragraph({
+        heading: HeadingLevel.HEADING_2,
+        spacing: { before: 240, after: 100 },
+        border: {
+          bottom: { style: BorderStyle.SINGLE, size: 6, color: "999999", space: 2 },
+        },
+        children: [
+          new TextRun({
+            text: section.heading,
+            bold: true,
+            size: SIZE.heading,
+            font: FONT,
+            color: "111111",
+            characterSpacing: 20,
+          }),
+        ],
+      }),
+    );
+
+    for (const line of section.lines) {
+      if (line.kind === "gap") {
+        children.push(new Paragraph({ text: "", spacing: { after: 40 } }));
+        continue;
+      }
+      if (line.kind === "bullet") {
+        children.push(
+          new Paragraph({
+            // A real Word list rather than a literal bullet character, which
+            // is what a parser expects to find.
+            bullet: { level: 0 },
+            spacing: { after: 50 },
+            children: [new TextRun({ text: line.text, size: SIZE.body, font: FONT })],
+          }),
+        );
+        continue;
+      }
+      children.push(
+        new Paragraph({
+          alignment: AlignmentType.LEFT,
+          spacing: { before: line.kind === "entry" ? 60 : 0, after: line.kind === "entry" ? 40 : 70 },
+          children: [
+            new TextRun({ text: line.text, bold: line.kind === "entry", size: SIZE.body, font: FONT }),
+          ],
+        }),
+      );
+    }
+  }
+
   const document = new Document({
     creator: "Callback",
-    title: options.name ? `${options.name} — CV` : "CV",
+    title: layout.name ? `${layout.name.text} — CV` : options.name ? `CV — ${options.name}` : "CV",
     description: "Improved CV exported from Callback",
     styles: {
       default: {
         document: {
-          run: { font: "Calibri", size: 21 },
-          paragraph: { spacing: { line: 276 } },
+          run: { font: FONT, size: SIZE.body },
+          paragraph: { spacing: { line: 264 } },
         },
       },
     },
@@ -126,8 +131,8 @@ export async function buildCvDocx(
       {
         properties: {
           page: {
-            // Generous single-column margins, no header or footer defined.
-            margin: { top: 720, bottom: 720, left: 720, right: 720 },
+            // Single column, no header or footer defined.
+            margin: { top: 720, bottom: 720, left: 800, right: 800 },
           },
         },
         children,
