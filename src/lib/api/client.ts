@@ -12,6 +12,8 @@ import type {
   AnalyzeResponse,
   ApiError,
   ApiErrorCode,
+  CoverLetterRequest,
+  CoverLetterResponse,
   PivotRequest,
   PivotResponse,
 } from "@/lib/types";
@@ -86,6 +88,13 @@ export function analyzeFit(
   signal?: AbortSignal,
 ): Promise<AnalyzeResponse> {
   return post<AnalyzeRequest, AnalyzeResponse>("/api/fit/analyze", request, signal);
+}
+
+export function requestCoverLetter(
+  request: CoverLetterRequest,
+  signal?: AbortSignal,
+): Promise<CoverLetterResponse> {
+  return post<CoverLetterRequest, CoverLetterResponse>("/api/fit/cover-letter", request, signal);
 }
 
 export function requestPivot(

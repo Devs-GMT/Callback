@@ -292,6 +292,15 @@ export class CvPdfWriter {
     this.draw(wrapped, this.x, this.reserve(wrapped.length * this.lineHeight(s.size.body)));
   }
 
+  /** A small muted line, such as the date on a letter. */
+  small(text: string, options: { gap?: number } = {}): void {
+    const s = this.s;
+    this.beforeBlock(options.gap ?? s.space.item);
+    this.font(s.font.body, "normal", s.size.small, CV_MUTED);
+    const wrapped = this.wrap(text, this.width);
+    this.draw(wrapped, this.x, this.reserve(wrapped.length * this.lineHeight(s.size.small)));
+  }
+
   /** Lines of a CV section, in order. */
   lines(lines: CvLine[]): void {
     for (const line of lines) {

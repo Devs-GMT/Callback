@@ -236,6 +236,48 @@ export type Report = {
   stamp?: StampInfo;
   /** Warnings carried over from extraction, shown on the ATS tab. */
   warnings: ExtractionWarning[];
+  /** The cover letter, once one has been written for this job. */
+  coverLetter?: CoverLetter;
+};
+
+/* -------------------------------------------------------------------------- */
+/* Cover letter                                                               */
+/* -------------------------------------------------------------------------- */
+
+export type CoverLetterTone = "professional" | "warm" | "confident";
+export type CoverLetterLength = "short" | "standard";
+
+/** A body paragraph and the CV quotes that back every claim in it. */
+export type CoverLetterParagraph = {
+  text: string;
+  /** Verified against the CV: each one appears in it. */
+  evidence: string[];
+};
+
+export type CoverLetterDraft = {
+  /** "Dear Ms Rivera," or "Dear Hiring Manager," */
+  greeting: string;
+  /** Names the role and why this candidate; no CV claims needed. */
+  opening: string;
+  body: CoverLetterParagraph[];
+  closing: string;
+  /** "Kind regards," — the candidate's name is added from the CV. */
+  signOff: string;
+};
+
+export type CoverLetterOptions = {
+  tone: CoverLetterTone;
+  length: CoverLetterLength;
+  hiringManager?: string;
+  /** In the user's own words: why this company. The only company facts used. */
+  motivation?: string;
+};
+
+export type CoverLetter = CoverLetterDraft & {
+  options: CoverLetterOptions;
+  createdAt: number;
+  /** Hand edits, as plain text. Once set, it is what is shown and exported. */
+  editedText?: string;
 };
 
 /**
@@ -296,6 +338,19 @@ export type PivotRequest = {
 export type PivotResponse = {
   suggestions: Suggestion[];
 };
+
+export type CoverLetterRequest = CoverLetterOptions & {
+  cvText: string;
+  jobText: string;
+  jobTitle?: string;
+  company?: string;
+  /** Matched requirements with their CV quote, the letter's raw material. */
+  strengths: Array<{ requirement: string; evidence: string }>;
+  /** Unmet requirements, so the letter can address one honestly. */
+  gaps: string[];
+};
+
+export type CoverLetterResponse = CoverLetterDraft;
 
 export type ApiErrorCode =
   | "bad_request"

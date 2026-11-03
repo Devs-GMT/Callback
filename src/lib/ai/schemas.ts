@@ -13,7 +13,7 @@
  */
 
 import { z } from "zod";
-import type { AnalyzeResponse, PivotResponse } from "@/lib/types";
+import type { AnalyzeResponse, CoverLetterResponse, PivotResponse } from "@/lib/types";
 
 const REQUIREMENT_TYPES = ["must", "nice"] as const;
 const REQUIREMENT_CATEGORIES = [
@@ -156,6 +156,28 @@ export const PIVOT_JSON_SCHEMA = {
     },
   },
   required: ["suggestions"],
+} as const satisfies Record<string, unknown>;
+
+export const COVER_LETTER_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    greeting: { type: "string" },
+    opening: { type: "string" },
+    body: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          text: { type: "string" },
+          evidence: { type: "array", items: { type: "string" } },
+        },
+        required: ["text", "evidence"],
+      },
+    },
+    closing: { type: "string" },
+    signOff: { type: "string" },
+  },
+  required: ["greeting", "opening", "body", "closing", "signOff"],
 } as const satisfies Record<string, unknown>;
 
 /* -------------------------------------------------------------------------- */
@@ -318,4 +340,31 @@ export function parsePivotResponse(raw: unknown): PivotResponse {
   });
 
   return { suggestions };
+}
+
+const coverLetterSchema = z.object({
+  greeting: text("Dear Hiring Manager,"),
+  opening: text(),
+  body: capped(
+    z.object({
+      text: text(),
+      evidence: capped(z.string(), 6),
+    }),
+    4,
+  ),
+  closing: text(),
+  signOff: text("Kind regards,"),
+});
+
+/**
+ * Validate the letter's shape. Evidence is checked against the CV separately,
+ * in `verifyCoverLetter`, because that needs the CV text.
+ */
+export function parseCoverLetterResponse(raw: unknown): CoverLetterResponse {
+  const parsed = coverLetterSchema.parse(raw);
+  return {
+    ...parsed,
+    greeting: parsed.greeting || "Dear Hiring Manager,",
+    signOff: parsed.signOff || "Kind regards,",
+  };
 }

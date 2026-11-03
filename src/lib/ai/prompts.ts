@@ -16,7 +16,7 @@
  */
 
 import { LIMITS } from "@/lib/config";
-import type { PivotRequest } from "@/lib/types";
+import type { CoverLetterRequest, PivotRequest } from "@/lib/types";
 
 /** Keep prompt input inside the caps from PRD section 4. */
 function cap(value: string, max: number): string {
@@ -164,6 +164,109 @@ export function buildPivotPrompt(input: PivotRequest): string {
     "=== END CV ===",
     "",
     "Write the suggestions. Copy every \"before\" from the CV exactly.",
+  );
+
+  return parts.join("\n");
+}
+
+/* -------------------------------------------------------------------------- */
+/* Cover letter                                                               */
+/* -------------------------------------------------------------------------- */
+
+export const COVER_LETTER_SYSTEM = `You are the cover-letter writer inside Callback. You write one short, specific cover letter from a job seeker's own CV for one job.
+
+NO-INVENTION RULE — this is absolute:
+- Every claim about the candidate must come from the CV. You may choose, order and phrase facts; you may not add experience, tools, employers, dates, numbers or outcomes that are not in the CV.
+- Every body paragraph must list in "evidence" the exact CV text it relies on, copied character for character, one quote per claim. A paragraph with no quote from the CV will be thrown away.
+- Say nothing about the company that is not in the job description or in the candidate's own note. No invented mission statements, products, values or news.
+- If the candidate lacks a requirement, never pretend otherwise. You may address one gap honestly, in a sentence, with what they would bring instead or how they are closing it — but only using facts from the CV.
+
+SHAPE:
+- "greeting": "Dear <name>," when a hiring manager's name is given, otherwise "Dear Hiring Manager,".
+- "opening": two or three sentences. Name the role. Say in concrete terms why this candidate fits — lead with their strongest match, not with enthusiasm. If the candidate wrote a note about why this company, use it here in their spirit.
+- "body": paragraphs that each make one argument: a requirement from the job, met with specific evidence from the CV, ideally with a result. Use the job's own language where the CV supports it.
+- "closing": one or two sentences that ask for the conversation. Not grovelling.
+- "signOff": "Kind regards," or "Best regards," or "Sincerely," to suit the tone. Do not add the candidate's name.
+
+SPECIFICS — what separates a good letter from a generic one:
+- Keep the CV's concrete details. When the CV has a number, a tool, a scale or a result ("40 store managers", "saving 6 hours a month", "cut overstock by 12%"), say it. Paraphrasing it into something vaguer ("reporting tools used by stakeholders") is a failure.
+- Name the employer or project from the CV when you use it ("At Acme Retail, I…").
+- Build the body from the matched requirements first. If they do not fill the length, use other achievements in the CV that are relevant to the job — never pad with generic sentences.
+
+STYLE:
+- Sound like a capable person writing plainly, not like a template. Vary sentence length.
+- Follow the requested number of paragraphs and sentences exactly.
+- Never describe the job posting itself: no "your requirement for", "the nice-to-have skills in your description", "as listed in the job ad". Just show the fit.
+- Banned openings and phrases: "I am writing to express my interest", "Furthermore", "In addition", "I am excited to apply", "I believe I would be a great fit", "passionate", "dynamic", "synergy", "leverage", "thrilled", "esteemed", "proven track record", "hit the ground running", "In today's fast-paced world".
+- No bullet points, no headings, no emoji, no flattery of the company.
+- Write in English, using the spelling the job description uses (British or American).
+
+Return only the JSON object the schema asks for.`;
+
+const TONES: Record<CoverLetterRequest["tone"], string> = {
+  professional: "Professional: measured, precise, quietly confident.",
+  warm: "Warm: friendly and human, still concise and specific.",
+  confident: "Confident: direct, assertive, results first, no hedging.",
+};
+
+// Sentence counts rather than word counts: the fast model follows them far
+// more closely, and measured letters came out well under a word target.
+const LENGTHS: Record<CoverLetterRequest["length"], string> = {
+  short:
+    "Short (about 200 words): opening of 3 sentences; exactly 2 body paragraphs of 3 to 4 sentences each; closing of 2 sentences.",
+  standard:
+    "Standard (about 300 words): opening of 3 to 4 sentences; exactly 3 body paragraphs of 4 sentences each; closing of 2 sentences.",
+};
+
+export function buildCoverLetterPrompt(input: CoverLetterRequest): string {
+  const parts: string[] = [
+    `Tone — ${TONES[input.tone]}`,
+    `Length — ${LENGTHS[input.length]}`,
+  ];
+
+  if (input.jobTitle?.trim()) parts.push(`Role: ${input.jobTitle.trim()}`);
+  if (input.company?.trim()) parts.push(`Company: ${input.company.trim()}`);
+  parts.push(
+    input.hiringManager?.trim()
+      ? `Hiring manager: ${input.hiringManager.trim()}`
+      : "Hiring manager: unknown",
+  );
+
+  if (input.motivation?.trim()) {
+    parts.push(
+      "",
+      "The candidate's own note on why this company (the only company facts you may add beyond the job description):",
+      cap(input.motivation, 600),
+    );
+  }
+
+  if (input.strengths.length > 0) {
+    parts.push(
+      "",
+      "Requirements already matched, with the CV quote that proves each (build the body from these):",
+      ...input.strengths.slice(0, 12).map((s) => `- ${s.requirement} — CV: "${s.evidence}"`),
+    );
+  }
+
+  if (input.gaps.length > 0) {
+    parts.push(
+      "",
+      "Requirements the CV does not meet (never claim these; address at most one honestly):",
+      ...input.gaps.slice(0, 10).map((gap) => `- ${gap}`),
+    );
+  }
+
+  parts.push(
+    "",
+    "=== JOB DESCRIPTION ===",
+    cap(input.jobText, LIMITS.jobChars),
+    "=== END JOB DESCRIPTION ===",
+    "",
+    "=== CV ===",
+    cap(input.cvText, LIMITS.cvChars),
+    "=== END CV ===",
+    "",
+    'Write the letter. Copy every "evidence" quote from the CV exactly.',
   );
 
   return parts.join("\n");

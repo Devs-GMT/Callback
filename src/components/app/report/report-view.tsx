@@ -12,14 +12,15 @@ import { AtsTab } from "@/components/app/report/ats-tab";
 import { MatchTab } from "@/components/app/report/match-tab";
 import { PivotTab } from "@/components/app/report/pivot-tab";
 import { ImprovedCvTab } from "@/components/app/report/improved-cv-tab";
+import { CoverLetterTab } from "@/components/app/report/cover-letter-tab";
 import { StampPanel } from "@/components/app/report/stamp-panel";
 import { topFixes } from "@/lib/analysis/ats";
 import { countApplied } from "@/lib/analysis/apply";
 import { formatDate } from "@/lib/utils";
-import type { Report, StampInfo, SuggestionDecision } from "@/lib/types";
+import type { CoverLetter, Report, StampInfo, SuggestionDecision } from "@/lib/types";
 
 /**
- * The report, across its five tabs (PRD section 2 step 4).
+ * The report, across its tabs (PRD section 2 step 4, plus the cover letter).
  *
  * The three-way responsive behaviour from PRD sections 7 and 8 is the main
  * structural job here:
@@ -33,7 +34,7 @@ import type { Report, StampInfo, SuggestionDecision } from "@/lib/types";
  * All three render the same components; only the placement changes.
  */
 
-export type ReportTab = "overview" | "ats" | "match" | "pivot" | "cv";
+export type ReportTab = "overview" | "ats" | "match" | "pivot" | "cv" | "letter";
 
 export function ReportView({
   report,
@@ -73,6 +74,11 @@ export function ReportView({
     [onUpdate, report],
   );
 
+  const setCoverLetter = useCallback(
+    (coverLetter: CoverLetter) => onUpdate({ ...report, coverLetter }),
+    [onUpdate, report],
+  );
+
   const onStamped = useCallback(
     (stamp: StampInfo) => onUpdate({ ...report, stamp }),
     [onUpdate, report],
@@ -98,6 +104,7 @@ export function ReportView({
           ) : undefined,
       },
       { id: "cv" as const, label: "Improved CV" },
+      { id: "letter" as const, label: "Cover letter" },
     ],
     [acceptedCount, hasMatch, report.suggestions.length],
   );
@@ -265,6 +272,12 @@ export function ReportView({
                 recheckBusy={recheckBusy}
                 onTextChange={setImprovedText}
               />
+            </TabPanel>
+          ) : null}
+
+          {tabs.value === "letter" ? (
+            <TabPanel id="letter" idBase={tabs.idBase}>
+              <CoverLetterTab report={report} onChange={setCoverLetter} />
             </TabPanel>
           ) : null}
         </div>

@@ -161,6 +161,13 @@ export function docxBlocks(docx: Docx, s: ResolvedCvStyle) {
       });
     },
 
+    small(text: string, after = s.space.item): Paragraph {
+      return new Paragraph({
+        spacing: { after: twip(after), line },
+        children: [run(text, s.font.body, s.size.small, { color: hex(CV_MUTED) })],
+      });
+    },
+
     gap(): Paragraph {
       return new Paragraph({ text: "", spacing: { after: twip(s.space.entry * 0.5), line: 120 } });
     },

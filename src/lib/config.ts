@@ -82,6 +82,11 @@ export const LIMITS = {
   jobTitleChars: 60,
   /** §4 rate limit: analyses per IP per day. */
   analysesPerDay: 8,
+  /** Cover letters per IP per day, a separate budget from analyses. */
+  coverLettersPerDay: 8,
+  /** The "why this company" note the user writes for the cover letter. */
+  motivationChars: 600,
+  hiringManagerChars: 80,
   /** §3 link extraction guards. */
   urlTimeoutMs: 5_000,
   urlBytes: 2 * 1024 * 1024,
