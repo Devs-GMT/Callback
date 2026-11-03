@@ -53,12 +53,16 @@ const SUGGESTION_KINDS = [
 /* JSON Schema for the provider                                               */
 /* -------------------------------------------------------------------------- */
 
+// No `maxItems` here. Gemini compiles the schema into a decoding state machine
+// and every array bound multiplies its states; with several bounded arrays of
+// enum-bearing objects it rejects the schema outright ("too many states for
+// serving"). The prompts state the counts, and `capped` below enforces them.
+
 export const ANALYZE_JSON_SCHEMA = {
   type: "object",
   properties: {
     requirements: {
       type: "array",
-      maxItems: 24,
       items: {
         type: "object",
         properties: {
@@ -72,7 +76,6 @@ export const ANALYZE_JSON_SCHEMA = {
     },
     matches: {
       type: "array",
-      maxItems: 24,
       items: {
         type: "object",
         properties: {
@@ -84,10 +87,9 @@ export const ANALYZE_JSON_SCHEMA = {
         required: ["requirementId", "status", "evidence", "note"],
       },
     },
-    keywords: { type: "array", maxItems: 30, items: { type: "string" } },
+    keywords: { type: "array", items: { type: "string" } },
     redFlags: {
       type: "array",
-      maxItems: 6,
       items: {
         type: "object",
         properties: {
@@ -111,7 +113,7 @@ export const ANALYZE_JSON_SCHEMA = {
       properties: {
         score: { type: "integer" },
         detail: { type: "string" },
-        weakBullets: { type: "array", maxItems: 8, items: { type: "string" } },
+        weakBullets: { type: "array", items: { type: "string" } },
       },
       required: ["score", "detail", "weakBullets"],
     },
@@ -137,7 +139,6 @@ export const PIVOT_JSON_SCHEMA = {
   properties: {
     suggestions: {
       type: "array",
-      maxItems: 12,
       items: {
         type: "object",
         properties: {
@@ -146,7 +147,7 @@ export const PIVOT_JSON_SCHEMA = {
           title: { type: "string" },
           before: { type: "string" },
           after: { type: "string" },
-          keywords: { type: "array", maxItems: 8, items: { type: "string" } },
+          keywords: { type: "array", items: { type: "string" } },
           rationale: { type: "string" },
           needsUserConfirmation: { type: "boolean" },
         },
@@ -160,6 +161,23 @@ export const PIVOT_JSON_SCHEMA = {
 /* -------------------------------------------------------------------------- */
 /* Zod validation and repair                                                  */
 /* -------------------------------------------------------------------------- */
+
+/** Caps per array, applied after decoding instead of in the JSON Schema. */
+const MAX = {
+  requirements: 24,
+  keywords: 30,
+  redFlags: 6,
+  weakBullets: 8,
+  suggestions: 12,
+  suggestionKeywords: 8,
+} as const;
+
+/** An array that falls back to empty and keeps at most `max` items. */
+const capped = <T extends z.ZodTypeAny>(item: T, max: number) =>
+  z
+    .array(item)
+    .catch([])
+    .transform((list) => list.slice(0, max));
 
 const text = (fallback = "") =>
   z
@@ -187,15 +205,18 @@ const redFlagSchema = z.object({
 });
 
 export const analyzeResponseSchema = z.object({
-  requirements: z.array(requirementSchema).catch([]),
-  matches: z.array(matchSchema).catch([]),
+  requirements: capped(requirementSchema, MAX.requirements),
+  matches: capped(matchSchema, MAX.requirements),
   keywords: z
     .array(z.string())
     .catch([])
     .transform((list) =>
-      list.map((k) => k.trim()).filter((k) => k.length > 0 && k.length <= 48),
+      list
+        .map((k) => k.trim())
+        .filter((k) => k.length > 0 && k.length <= 48)
+        .slice(0, MAX.keywords),
     ),
-  redFlags: z.array(redFlagSchema).catch([]),
+  redFlags: capped(redFlagSchema, MAX.redFlags),
   seniority: z
     .object({
       jobLevel: z.enum(SENIORITY_LEVELS).catch("unknown"),
@@ -209,7 +230,7 @@ export const analyzeResponseSchema = z.object({
       // is the model misreading the brief rather than a real signal.
       score: z.coerce.number().catch(0),
       detail: text(),
-      weakBullets: z.array(z.string()).catch([]),
+      weakBullets: capped(z.string(), MAX.weakBullets),
     })
     .catch({ score: 0, detail: "", weakBullets: [] }),
   looksLikeCv: z.coerce.boolean().catch(true),
@@ -223,13 +244,13 @@ const suggestionSchema = z.object({
   title: z.string().min(1).transform((v) => v.trim()),
   before: text().optional(),
   after: text().optional(),
-  keywords: z.array(z.string()).catch([]).optional(),
+  keywords: capped(z.string(), MAX.suggestionKeywords).optional(),
   rationale: text(),
   needsUserConfirmation: z.coerce.boolean().catch(false).optional(),
 });
 
 export const pivotResponseSchema = z.object({
-  suggestions: z.array(suggestionSchema).catch([]),
+  suggestions: capped(suggestionSchema, MAX.suggestions),
 });
 
 /* -------------------------------------------------------------------------- */

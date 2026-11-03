@@ -27,6 +27,8 @@ export type GenerateJsonOptions = {
   schema: JsonSchema;
   /** Lower is more deterministic. Extraction wants near-zero. */
   temperature?: number;
+  /** How long the model reasons before answering. See `THINKING`. */
+  thinking?: ThinkingLevel;
   /** Abort the upstream call when the route's budget runs out. */
   signal?: AbortSignal;
 };
@@ -57,14 +59,38 @@ export class AiUpstreamError extends Error {
 /**
  * Model choice per task.
  *
- * Analyse is schema-constrained extraction over long input, so the cheapest
- * fast model is the right default and keeps the free-tier daily quota for
- * actual users. Pivot writes prose that a person will paste into their CV, so
- * it gets the stronger model.
+ * Both default to the fast model. Pivot used to get the stronger
+ * gemini-3.8-flash for its prose, but measured on a real CV it generated at
+ * roughly 4 tokens a second and took 100 to 250 s per call, far past the
+ * route's 60 s budget, while flash-lite returned the same kinds of
+ * suggestions in about 18 s. Set GEMINI_MODEL_PIVOT to trade speed back for
+ * prose quality.
  */
 export const MODELS = {
   analyze: process.env.GEMINI_MODEL_ANALYZE ?? "gemini-3.5-flash-lite",
-  pivot: process.env.GEMINI_MODEL_PIVOT ?? "gemini-3.8-flash",
+  pivot: process.env.GEMINI_MODEL_PIVOT ?? "gemini-3.5-flash-lite",
+} as const;
+
+export type ThinkingLevel = "minimal" | "low" | "medium" | "high";
+
+function thinkingFrom(value: string | undefined, fallback: ThinkingLevel): ThinkingLevel {
+  return value === "minimal" || value === "low" || value === "medium" || value === "high"
+    ? value
+    : fallback;
+}
+
+/**
+ * Reasoning effort per task.
+ *
+ * Gemini 3 models think at length by default, which on a full CV and job
+ * description pushed each call past a minute — longer than the routes'
+ * `maxDuration`. Neither task needs it: analyse is extraction against a fixed
+ * schema, and pivot rewrites bullets under tight rules spelled out in the
+ * prompt. Override with GEMINI_THINKING_ANALYZE / GEMINI_THINKING_PIVOT.
+ */
+export const THINKING = {
+  analyze: thinkingFrom(process.env.GEMINI_THINKING_ANALYZE, "minimal"),
+  pivot: thinkingFrom(process.env.GEMINI_THINKING_PIVOT, "low"),
 } as const;
 
 function apiKey(): string | undefined {
@@ -143,6 +169,7 @@ export async function generateJson<T = unknown>(
         },
         generation_config: {
           temperature: options.temperature ?? 0.1,
+          thinking_level: options.thinking ?? THINKING.analyze,
         },
         // Do not retain the CV or job text on the provider side.
         store: false,

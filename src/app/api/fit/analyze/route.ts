@@ -14,7 +14,7 @@
  * `body` anywhere below, including in the error paths.
  */
 
-import { MODELS, AiNotConfiguredError, AiRateLimitedError, AiUpstreamError, generateJson, isAiConfigured } from "@/lib/ai/provider";
+import { MODELS, THINKING, AiNotConfiguredError, AiRateLimitedError, AiUpstreamError, generateJson, isAiConfigured } from "@/lib/ai/provider";
 import { ANALYZE_SYSTEM, buildAnalyzePrompt } from "@/lib/ai/prompts";
 import { ANALYZE_JSON_SCHEMA, parseAnalyzeResponse } from "@/lib/ai/schemas";
 import { LIMITS } from "@/lib/config";
@@ -93,6 +93,7 @@ export async function POST(request: Request): Promise<Response> {
   try {
     const raw = await generateJson<unknown>({
       model: MODELS.analyze,
+      thinking: THINKING.analyze,
       system: ANALYZE_SYSTEM,
       prompt: buildAnalyzePrompt({ cvText, jobText, jobTitle, seniority }),
       schema: ANALYZE_JSON_SCHEMA,

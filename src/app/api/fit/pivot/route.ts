@@ -13,7 +13,7 @@
  * Privacy: as with the analyse route, nothing here logs the CV or job text.
  */
 
-import { MODELS, AiNotConfiguredError, AiRateLimitedError, AiUpstreamError, generateJson, isAiConfigured } from "@/lib/ai/provider";
+import { MODELS, THINKING, AiNotConfiguredError, AiRateLimitedError, AiUpstreamError, generateJson, isAiConfigured } from "@/lib/ai/provider";
 import { PIVOT_SYSTEM, buildPivotPrompt } from "@/lib/ai/prompts";
 import { PIVOT_JSON_SCHEMA, parsePivotResponse } from "@/lib/ai/schemas";
 import { LIMITS } from "@/lib/config";
@@ -83,6 +83,7 @@ export async function POST(request: Request): Promise<Response> {
   try {
     const raw = await generateJson<unknown>({
       model: MODELS.pivot,
+      thinking: THINKING.pivot,
       system: PIVOT_SYSTEM,
       prompt: buildPivotPrompt(payload),
       schema: PIVOT_JSON_SCHEMA,
