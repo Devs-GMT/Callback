@@ -1,23 +1,22 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Copy, Download, Pencil, RefreshCw, Sparkles } from "lucide-react";
+import { Copy, Download, Palette, Pencil, RefreshCw, Sparkles } from "lucide-react";
 import { Card, Eyebrow } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tag } from "@/components/ui/tag";
 import { TextAreaField } from "@/components/ui/field";
 import { applySuggestions, countApplied } from "@/lib/analysis/apply";
-import {
-  layoutCv,
-  layoutText,
-  layoutToText,
-  type CvLayout,
-  type CvLine,
-} from "@/lib/analysis/cv-layout";
+import { layoutCv, layoutText, layoutToText } from "@/lib/analysis/cv-layout";
+import type { CvStyle } from "@/lib/cv-templates";
 import { buildCvDocx, cvFilename, downloadBlob } from "@/lib/export/cv-docx";
+import { buildCvPdf } from "@/lib/export/cv-pdf";
 import { LIMITS } from "@/lib/config";
+import { loadCvStyle, saveCvStyle } from "@/lib/store/local";
 import type { Report } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { CvPage } from "./cv-page";
+import { TemplatePicker } from "./template-picker";
 
 /**
  * The Improved CV tab (PRD section 2 step 4).
@@ -32,9 +31,9 @@ import { cn } from "@/lib/utils";
  * claiming to show "what changed" after arbitrary edits would be a lie, and
  * the diff the user cares about by then is the one they are making themselves.
  *
- * Either way the CV is shown through `layoutCv`: one name, one contact line,
- * upper-case section headings with a divider, one bullet style. That is the
- * same structure the .docx is built from, so what you see is what downloads.
+ * Either way the CV is shown through `layoutCv` in the chosen template. The
+ * preview, the PDF and the .docx are all drawn from the same layout and the
+ * same template numbers, so what you see is what downloads.
  */
 export function ImprovedCvTab({
   report,
@@ -60,7 +59,16 @@ export function ImprovedCvTab({
 
   const [editing, setEditing] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [exporting, setExporting] = useState(false);
+  const [exporting, setExporting] = useState<"pdf" | "docx" | null>(null);
+  const [exportFailed, setExportFailed] = useState(false);
+  const [showDesign, setShowDesign] = useState(true);
+  // The report view only renders in the browser, so localStorage is safe here.
+  const [style, setStyle] = useState<CvStyle>(() => loadCvStyle());
+
+  const changeStyle = (next: CvStyle) => {
+    setStyle(next);
+    saveCvStyle(next);
+  };
 
   /**
    * Hand edits, or null when there are none.
@@ -85,16 +93,23 @@ export function ImprovedCvTab({
     }
   };
 
-  const download = async () => {
-    setExporting(true);
+  // Hand edits are laid out again, so they get the same structure.
+  const shown = edited ? layoutText(text) : layout;
+
+  const download = async (format: "pdf" | "docx") => {
+    setExporting(format);
+    setExportFailed(false);
     try {
-      // Hand edits are laid out again, so they get the same structure.
-      const blob = await buildCvDocx(edited ? layoutText(text) : layout, {
-        name: report.jobTitle,
-      });
-      downloadBlob(blob, cvFilename(report.jobTitle));
+      const options = { title: `CV — ${report.jobTitle}` };
+      const blob =
+        format === "pdf"
+          ? await buildCvPdf(shown, style, options)
+          : await buildCvDocx(shown, style, options);
+      downloadBlob(blob, cvFilename(report.jobTitle, format));
+    } catch {
+      setExportFailed(true);
     } finally {
-      setExporting(false);
+      setExporting(null);
     }
   };
 
@@ -120,11 +135,20 @@ export function ImprovedCvTab({
             <Button
               tone="outline"
               size="sm"
-              onClick={() => void download()}
-              disabled={exporting}
+              onClick={() => void download("pdf")}
+              disabled={exporting !== null}
             >
               <Download className="size-3.5" aria-hidden="true" />
-              {exporting ? "Building…" : ".docx"}
+              {exporting === "pdf" ? "Building…" : "PDF"}
+            </Button>
+            <Button
+              tone="outline"
+              size="sm"
+              onClick={() => void download("docx")}
+              disabled={exporting !== null}
+            >
+              <Download className="size-3.5" aria-hidden="true" />
+              {exporting === "docx" ? "Building…" : ".docx"}
             </Button>
             <Button
               size="sm"
@@ -151,12 +175,19 @@ export function ImprovedCvTab({
             them across by hand from the &ldquo;What to pivot&rdquo; tab.
           </p>
         ) : null}
+
+        {exportFailed ? (
+          <p role="alert" className="mt-4 rounded-[4px] bg-coral/50 px-3 py-2.5 text-[12px] leading-relaxed text-coral-ink">
+            The download couldn&apos;t be built. Try again, or use Copy and paste
+            the text into your own document.
+          </p>
+        ) : null}
       </Card>
 
       {/* ---------- The CV ---------- */}
       <Card bare>
         <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {!editing && acceptedCount > 0 ? (
               <Tag tone="mint">
                 <Sparkles className="size-3" aria-hidden="true" />
@@ -166,27 +197,44 @@ export function ImprovedCvTab({
             {edited ? <Tag tone="yellow">Edited by you</Tag> : null}
           </div>
 
-          <Button
-            tone="ghost"
-            size="sm"
-            onClick={() => {
-              if (editing) {
-                onTextChange(text);
-                setEditing(false);
-              } else {
-                // Seed the editor with what is on screen, so the first
-                // keystroke does not start from an empty box.
-                setManual(text);
-                setEditing(true);
-              }
-            }}
-          >
-            <Pencil className="size-3.5" aria-hidden="true" />
-            {editing ? "Done editing" : "Edit"}
-          </Button>
+          <div className="flex shrink-0 gap-1">
+            <Button
+              tone="ghost"
+              size="sm"
+              aria-expanded={showDesign}
+              onClick={() => setShowDesign((open) => !open)}
+            >
+              <Palette className="size-3.5" aria-hidden="true" />
+              Design
+            </Button>
+            <Button
+              tone="ghost"
+              size="sm"
+              onClick={() => {
+                if (editing) {
+                  onTextChange(text);
+                  setEditing(false);
+                } else {
+                  // Seed the editor with what is on screen, so the first
+                  // keystroke does not start from an empty box.
+                  setManual(text);
+                  setEditing(true);
+                }
+              }}
+            >
+              <Pencil className="size-3.5" aria-hidden="true" />
+              {editing ? "Done editing" : "Edit"}
+            </Button>
+          </div>
         </div>
 
-        <div className="p-5">
+        {showDesign ? (
+          <div className="border-b border-line px-5 py-5">
+            <TemplatePicker layout={shown} value={style} onChange={changeStyle} />
+          </div>
+        ) : null}
+
+        <div className="bg-sand/60 p-3 sm:p-6">
           {editing ? (
             <TextAreaField
               label="Your improved CV"
@@ -198,94 +246,17 @@ export function ImprovedCvTab({
               className="font-mono"
             />
           ) : (
-            <CvPreview layout={edited ? layoutText(text) : layout} />
+            <CvPage layout={shown} style={style} />
           )}
         </div>
       </Card>
 
       <p className="text-[11.5px] leading-relaxed text-muted">
-        The .docx export uses this same single-column layout: plain section
-        dividers, real bullet lists, and no tables, images or columns — the
-        format an applicant tracking system reads most reliably.
+        Every template is a single column with standard headings, real bullet
+        lists and no tables, images or text boxes — the format an applicant
+        tracking system reads most reliably. Send the PDF unless a job asks
+        for Word.
       </p>
-    </div>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/* Preview                                                                    */
-/* -------------------------------------------------------------------------- */
-
-/** Mint wash on lines a suggestion changed, with the original on hover. */
-function changedProps(line: Pick<CvLine, "changed" | "replaced">) {
-  return {
-    className: cn(line.changed && "rounded-[2px] bg-mint/45 px-1 -mx-1"),
-    title: line.replaced ? `Was: ${line.replaced.trim()}` : undefined,
-  };
-}
-
-/** The CV as a single-column page, mirroring the .docx. */
-function CvPreview({ layout }: { layout: CvLayout }) {
-  return (
-    <article className="mx-auto max-w-[72ch] rounded-[6px] bg-white px-5 py-6 text-ink ring-1 ring-black/5 sm:px-9 sm:py-8">
-      {layout.name ? (
-        <h2 className="text-[22px] font-semibold leading-tight tracking-[-0.01em]">
-          <span {...changedProps(layout.name)}>{layout.name.text}</span>
-        </h2>
-      ) : null}
-      {layout.contact.map((line, index) => (
-        <p key={index} className="mt-1 break-words text-[12px] leading-relaxed text-muted">
-          <span {...changedProps(line)}>{line.text}</span>
-        </p>
-      ))}
-
-      {layout.sections.map((section, sectionIndex) => (
-        <section key={sectionIndex} className="mt-6 first:mt-0">
-          <h3 className="border-b border-ink/25 pb-1 text-[11.5px] font-semibold tracking-[0.12em]">
-            {section.heading}
-          </h3>
-          <SectionBody lines={section.lines} />
-        </section>
-      ))}
-    </article>
-  );
-}
-
-/** Group consecutive bullets into one list so they render as a real <ul>. */
-function SectionBody({ lines }: { lines: CvLine[] }) {
-  const blocks: Array<CvLine | CvLine[]> = [];
-  for (const line of lines) {
-    const last = blocks[blocks.length - 1];
-    if (line.kind === "bullet") {
-      if (Array.isArray(last)) last.push(line);
-      else blocks.push([line]);
-    } else {
-      blocks.push(line);
-    }
-  }
-
-  return (
-    <div className="mt-2.5 flex flex-col gap-1 text-[12.5px] leading-[1.65]">
-      {blocks.map((block, index) =>
-        Array.isArray(block) ? (
-          <ul key={index} className="ml-4 list-disc space-y-1 marker:text-ink/50">
-            {block.map((line, i) => (
-              <li key={i} className="break-words pl-1">
-                <span {...changedProps(line)}>{line.text}</span>
-              </li>
-            ))}
-          </ul>
-        ) : block.kind === "gap" ? (
-          <div key={index} className="h-2" aria-hidden="true" />
-        ) : (
-          <p
-            key={index}
-            className={cn("break-words", block.kind === "entry" && "mt-1 font-semibold")}
-          >
-            <span {...changedProps(block)}>{block.text}</span>
-          </p>
-        ),
-      )}
     </div>
   );
 }

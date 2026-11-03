@@ -24,11 +24,24 @@ export type CvLineKind =
   /** A paragraph break worth keeping, such as between two jobs. */
   | "gap";
 
+/**
+ * An entry line read into its parts, so a template can set the role in bold
+ * and push the dates to the right margin. `text` on the line stays the whole
+ * original string; this is a reading of it, not a replacement.
+ */
+export type CvEntryParts = {
+  title: string;
+  org?: string;
+  dates?: string;
+};
+
 export type CvLine = {
   kind: CvLineKind;
   text: string;
   changed: boolean;
   replaced?: string;
+  /** Only on `entry` lines. */
+  parts?: CvEntryParts;
 };
 
 export type CvSection = {
@@ -40,7 +53,9 @@ export type CvSection = {
 
 export type CvLayout = {
   name?: CvLine;
-  /** Headline and contact lines under the name. */
+  /** The one-line professional title under the name: "Junior Data Analyst". */
+  headline?: CvLine;
+  /** Contact lines under the headline, usually one joined line. */
   contact: CvLine[];
   sections: CvSection[];
 };
@@ -58,6 +73,57 @@ export const BULLET_MARKER = /^\s*(?:[-–—•·*▪◦‣]|\d{1,2}[.)])\s+/;
 
 const CONTACT_HINT =
   /@|https?:\/\/|www\.|linkedin|github|portfolio|\+?\d[\d\s().-]{6,}\d/i;
+
+/** "London, UK" or "Jakarta Selatan, Indonesia": a place, not a headline. */
+const LOCATION = /^[\p{L}][\p{L} .'’-]*,\s*[\p{L}][\p{L} .'’-]*$/u;
+
+// English and Indonesian month names, full and short.
+const MONTH =
+  "jan(?:uary|uari)?|feb(?:ruary|ruari)?|mar(?:ch|et)?|apr(?:il)?|ma[yi]|jun(?:e|i)?|jul(?:y|i)?|aug(?:ust)?|agu(?:stus)?|agt|sep(?:t(?:ember)?)?|o[ck]t(?:ober)?|nov(?:ember)?|de[cs](?:ember)?";
+const PRESENT = "present|current|now|today|ongoing|sekarang|saat\\s+ini";
+const DATE = `(?:(?:${MONTH})\\.?\\s+)?(?:19|20)\\d{2}|\\d{1,2}[/.](?:19|20)\\d{2}`;
+const DATE_RANGE = `(?:${DATE})(?:\\s*(?:-|–|—|to|until|sampai|hingga|s\\.?d\\.?)\\s*(?:${DATE}|${PRESENT}))?`;
+
+/**
+ * Dates at the end of a line, set off by a comma, pipe, spaced dash, tab, a
+ * run of spaces or brackets. "Graduated in 2020" has no separator, so prose
+ * that happens to end on a year is left alone.
+ */
+const TRAILING_DATES = new RegExp(
+  `(?:\\s*[,|·•]\\s*|\\s+[-–—]\\s+|\\t+|\\s{2,}|\\s*\\(\\s*)(${DATE_RANGE})\\s*\\)?\\s*$`,
+  "i",
+);
+
+/** Between role and organisation, in the order they are trusted. */
+const ENTRY_SEPARATORS = [/\s+\|\s+/, /\s+[–—]\s+/, /\s+-\s+/, /\s*,\s+/, /\s+at\s+/i, /\s+di\s+/i];
+
+/**
+ * Read "Data Analyst, Acme Retail, 2021 - 2024" into title, org and dates.
+ * Returns undefined when there is nothing to split, so the caller can keep
+ * the line as written.
+ */
+export function splitEntry(text: string): CvEntryParts | undefined {
+  const trimmed = text.trim();
+  let rest = trimmed;
+  let dates: string | undefined;
+
+  const match = trimmed.match(TRAILING_DATES);
+  if (match && match.index !== undefined && match.index > 0) {
+    dates = match[1].replace(/\s*(-|–|—)\s*/, " – ").replace(/\s+/g, " ");
+    rest = trimmed.slice(0, match.index).replace(/[\s,|·•–—-]+$/, "");
+  }
+  if (rest.length === 0) return undefined;
+
+  for (const separator of ENTRY_SEPARATORS) {
+    const at = rest.search(separator);
+    if (at > 0) {
+      const sep = rest.slice(at).match(separator)?.[0] ?? "";
+      const org = rest.slice(at + sep.length).trim();
+      if (org.length > 0) return { title: rest.slice(0, at).trim(), org, dates };
+    }
+  }
+  return dates ? { title: rest, dates } : undefined;
+}
 
 /** Does this line read as a section heading? */
 export function isHeading(line: string): boolean {
@@ -117,14 +183,16 @@ function tidy(lines: CvLine[]): CvLine[] {
   while (out.length > 0 && out[out.length - 1].kind === "gap") out.pop();
 
   // A short plain line directly above a bullet introduces it: "Data Analyst,
-  // Acme Retail, 2021 to 2024". Making it an entry lets it be set in bold.
-  return out.map((line, index) =>
-    line.kind === "text" &&
-    line.text.length <= 120 &&
-    out[index + 1]?.kind === "bullet"
-      ? { ...line, kind: "entry" }
-      : line,
-  );
+  // Acme Retail, 2021 to 2024". Making it an entry lets it be set in bold. A
+  // short line ending in dates is one too, even with no bullets under it, which
+  // is how most education lines look.
+  return out.map((line, index) => {
+    if (line.kind !== "text" || line.text.length > 120) return line;
+    const parts = splitEntry(line.text);
+    const introducesBullets = out[index + 1]?.kind === "bullet";
+    const datedLine = parts?.dates !== undefined && !/[.!?;]$/.test(line.text);
+    return introducesBullets || datedLine ? { ...line, kind: "entry", parts } : line;
+  });
 }
 
 export function layoutCv(segments: CvSegment[]): CvLayout {
@@ -154,11 +222,25 @@ export function layoutCv(segments: CvSegment[]): CvLayout {
     !/[.!?]$/.test(nameLine.text);
 
   const headerLines = looksLikeName ? rest : opening;
-  const contactBits = headerLines.filter((line) => CONTACT_HINT.test(line.text));
-  const contact: CvLine[] = headerLines.filter((line) => !CONTACT_HINT.test(line.text));
+  const others = headerLines.filter((line) => !CONTACT_HINT.test(line.text));
+
+  // The first line that is neither contact detail nor place is the headline.
+  const headlineIndex = looksLikeName
+    ? others.findIndex((line) => line.text.length <= 80 && !LOCATION.test(line.text))
+    : -1;
+  const headline = headlineIndex === -1 ? undefined : others[headlineIndex];
+  const remaining = others.filter((_, index) => index !== headlineIndex);
+
+  // Short leftovers (a city) join the contact details; anything longer keeps
+  // its own line rather than being squeezed in.
+  const joinable = (line: CvLine) => CONTACT_HINT.test(line.text) || line.text.length <= 40;
+  const contactBits = headerLines.filter(
+    (line) => line !== headline && joinable(line),
+  );
+  const contact: CvLine[] = remaining.filter((line) => !joinable(line));
   if (contactBits.length > 0) {
-    // One "email | phone | link" line is what most parsers and recruiters
-    // expect, and it saves the vertical space a stacked block wastes.
+    // One "city | email | phone | link" line is what most parsers and
+    // recruiters expect, and it saves the vertical space a stacked block wastes.
     contact.push({
       kind: "text",
       text: contactBits.map((line) => line.text).join("  |  "),
@@ -191,6 +273,7 @@ export function layoutCv(segments: CvSegment[]): CvLayout {
 
   return {
     name: looksLikeName ? { ...nameLine, kind: "text" } : undefined,
+    headline,
     contact,
     // A heading with nothing under it is noise, usually a stray label.
     sections: sections.filter((section) => section.lines.length > 0),
@@ -207,7 +290,11 @@ export function layoutCv(segments: CvSegment[]): CvLayout {
 export function layoutToText(layout: CvLayout): string {
   const blocks: string[] = [];
 
-  const head = [layout.name?.text, ...layout.contact.map((line) => line.text)].filter(
+  const head = [
+    layout.name?.text,
+    layout.headline?.text,
+    ...layout.contact.map((line) => line.text),
+  ].filter(
     (value): value is string => Boolean(value),
   );
   if (head.length > 0) blocks.push(head.join("\n"));

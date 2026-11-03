@@ -11,12 +11,14 @@
  * without history rather than crashing.
  */
 
+import { parseCvStyle, type CvStyle } from "@/lib/cv-templates";
 import type { ApplicationRow, ApplicationStatus, Report } from "@/lib/types";
 
 const KEYS = {
   reports: "callback.reports.v1",
   salt: "callback.salt.v1",
   consentSeen: "callback.notice.v1",
+  cvStyle: "callback.cv-style.v1",
 } as const;
 
 /** Keep the history bounded so a long-lived browser profile cannot fill up. */
@@ -200,6 +202,15 @@ export function hasSeenPrivacyNotice(): boolean {
 
 export function markPrivacyNoticeSeen(): void {
   safeWrite(KEYS.consentSeen, true);
+}
+
+/** The CV template, accent and density last chosen, shared by every report. */
+export function loadCvStyle(): CvStyle {
+  return parseCvStyle(safeRead<unknown>(KEYS.cvStyle, null));
+}
+
+export function saveCvStyle(style: CvStyle): void {
+  safeWrite(KEYS.cvStyle, style);
 }
 
 /* -------------------------------------------------------------------------- */

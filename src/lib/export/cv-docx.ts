@@ -1,129 +1,188 @@
 /**
- * Exporting the improved CV as a .docx.
+ * Exporting the improved CV as a .docx, in the chosen template.
  *
- * PRD section 2 step 4 asks for a "simple ATS-friendly layout", which is the
- * whole specification: the document deliberately has no columns, no tables, no
- * text boxes, no images, no headers and no footers — the five things the ATS
- * formatting check penalises. A single column of styled paragraphs in a
- * standard font is the most machine-readable thing Word can hold.
+ * PRD section 2 step 4 asks for a "simple ATS-friendly layout". Every template
+ * keeps to that: no columns, no tables, no text boxes, no images, no headers
+ * and no footers — the five things the ATS formatting check penalises. A
+ * single column of styled paragraphs is the most machine-readable thing Word
+ * can hold, so the export scores full marks on formatting if re-imported.
  *
- * That also means the exported CV scores full marks on the formatting check if
- * the user re-imports it, which is the point. The structure itself (name,
- * contact line, sections) comes from `layoutCv`.
+ * Templates map onto Word with what Word does natively: paragraph borders for
+ * divider rules, a right-aligned tab stop for dates, real list bullets. Fonts
+ * are ones every copy of Word has (Calibri, Georgia) rather than embedded
+ * files, because an ATS reads the text, not the typeface, and an embedded
+ * font only makes the file larger.
  */
 
-import type { CvLayout } from "@/lib/analysis/cv-layout";
+import type { CvLayout, CvLine } from "@/lib/analysis/cv-layout";
+import {
+  CV_INK,
+  CV_MUTED,
+  CV_PAGE,
+  resolveCvStyle,
+  type CvStyle,
+  type FontFamily,
+  type ResolvedCvStyle,
+} from "@/lib/cv-templates";
 
 export type CvDocxOptions = {
-  /** Used for the document title. */
-  name?: string;
+  /** Used for the document title when the CV has no name line. */
+  title?: string;
 };
 
-const FONT = "Calibri";
-/** Sizes are in half-points. */
-const SIZE = { name: 32, heading: 22, body: 21, contact: 19 } as const;
+const WORD_FONT: Record<FontFamily, string> = { sans: "Calibri", serif: "Georgia" };
 
 /**
- * Build the .docx and hand it back as a Blob.
- *
- * Section dividers are a bottom border on the heading paragraph rather than a
- * drawn line or a table: a paragraph border is plain formatting that every
- * parser skips, while shapes and tables are exactly what trips ATS reading.
- *
- * `docx` is imported dynamically: it is a sizeable dependency that only
- * matters the moment someone clicks download, and it has no business in the
- * initial bundle of a page most visitors will only read.
+ * Calibri sets noticeably smaller than Inter at the same nominal size, so
+ * sans text is scaled up to keep the page looking like the preview.
  */
-export async function buildCvDocx(
-  layout: CvLayout,
-  options: CvDocxOptions = {},
-): Promise<Blob> {
-  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, BorderStyle } =
-    await import("docx");
+const WORD_SCALE: Record<FontFamily, number> = { sans: 1.08, serif: 1 };
 
-  const children: InstanceType<typeof Paragraph>[] = [];
+type Docx = typeof import("docx");
+type Paragraph = InstanceType<Docx["Paragraph"]>;
 
-  if (layout.name) {
-    children.push(
-      new Paragraph({
-        heading: HeadingLevel.TITLE,
-        alignment: AlignmentType.LEFT,
-        spacing: { after: 60 },
-        children: [
-          new TextRun({ text: layout.name.text, bold: true, size: SIZE.name, font: FONT, color: "111111" }),
-        ],
-      }),
-    );
-  }
+/** Points to half-points (font sizes) and twentieths (spacing, margins). */
+const half = (pt: number) => Math.round(pt * 2);
+const twip = (pt: number) => Math.round(pt * 20);
+const hex = (colour: string) => colour.replace("#", "");
 
-  for (const line of layout.contact) {
-    children.push(
-      new Paragraph({
-        spacing: { after: 40 },
-        children: [new TextRun({ text: line.text, size: SIZE.contact, font: FONT, color: "444444" })],
-      }),
-    );
-  }
+/** Paragraph builders shared by the CV and the cover letter. */
+export function docxBlocks(docx: Docx, s: ResolvedCvStyle) {
+  const { Paragraph, TextRun, AlignmentType, BorderStyle, TabStopType, HeadingLevel } = docx;
+  const contentWidth = twip(CV_PAGE.width - s.margin.x * 2);
+  const size = (family: FontFamily, pt: number) => half(pt * WORD_SCALE[family]);
+  const line = Math.round(240 * s.space.line * 0.92);
+  const align = s.header === "center" ? AlignmentType.CENTER : AlignmentType.LEFT;
 
-  for (const section of layout.sections) {
-    children.push(
-      new Paragraph({
-        heading: HeadingLevel.HEADING_2,
-        spacing: { before: 240, after: 100 },
-        border: {
-          bottom: { style: BorderStyle.SINGLE, size: 6, color: "999999", space: 2 },
-        },
-        children: [
-          new TextRun({
-            text: section.heading,
-            bold: true,
-            size: SIZE.heading,
-            font: FONT,
-            color: "111111",
-            characterSpacing: 20,
-          }),
-        ],
-      }),
-    );
+  const run = (text: string, family: FontFamily, pt: number, extra: Record<string, unknown> = {}) =>
+    new TextRun({ text, font: WORD_FONT[family], size: size(family, pt), color: hex(CV_INK), ...extra });
 
-    for (const line of section.lines) {
-      if (line.kind === "gap") {
-        children.push(new Paragraph({ text: "", spacing: { after: 40 } }));
-        continue;
-      }
-      if (line.kind === "bullet") {
-        children.push(
+  return {
+    contentWidth,
+
+    header(name: string | undefined, headline: string | undefined, lines: string[]): Paragraph[] {
+      const out: Paragraph[] = [];
+      if (name) {
+        out.push(
           new Paragraph({
-            // A real Word list rather than a literal bullet character, which
-            // is what a parser expects to find.
-            bullet: { level: 0 },
-            spacing: { after: 50 },
-            children: [new TextRun({ text: line.text, size: SIZE.body, font: FONT })],
+            heading: HeadingLevel.TITLE,
+            alignment: align,
+            spacing: { after: twip(s.size.name * 0.25), line: 240 },
+            children: [
+              run(name, s.font.name, s.size.name, {
+                bold: s.nameBold,
+                color: hex(s.nameInAccent ? s.accent : CV_INK),
+              }),
+            ],
           }),
         );
-        continue;
       }
-      children.push(
-        new Paragraph({
-          alignment: AlignmentType.LEFT,
-          spacing: { before: line.kind === "entry" ? 60 : 0, after: line.kind === "entry" ? 40 : 70 },
-          children: [
-            new TextRun({ text: line.text, bold: line.kind === "entry", size: SIZE.body, font: FONT }),
-          ],
-        }),
-      );
-    }
-  }
+      if (headline) {
+        out.push(
+          new Paragraph({
+            alignment: align,
+            spacing: { after: twip(2), line },
+            children: [run(headline, s.font.body, s.size.body + 1)],
+          }),
+        );
+      }
+      lines.forEach((text, index) => {
+        out.push(
+          new Paragraph({
+            alignment: align,
+            spacing: { after: index === lines.length - 1 ? twip(s.space.section * 0.5) : 0, line },
+            children: [run(text, s.font.body, s.size.small, { color: hex(CV_MUTED) })],
+          }),
+        );
+      });
+      return out;
+    },
 
-  const document = new Document({
+    heading(text: string): Paragraph {
+      const colour = s.heading === "rule" ? CV_INK : s.accent;
+      return new Paragraph({
+        heading: HeadingLevel.HEADING_2,
+        keepNext: true,
+        spacing: { before: twip(s.space.section), after: twip(s.space.afterHeading) },
+        border:
+          s.heading === "accent"
+            ? undefined
+            : {
+                bottom: {
+                  style: BorderStyle.SINGLE,
+                  size: s.heading === "rule" ? 6 : 10,
+                  color: hex(s.accent),
+                  space: 2,
+                },
+              },
+        children: [
+          run(text, s.font.heading, s.size.heading, {
+            bold: true,
+            color: hex(colour),
+            characterSpacing: twip(s.headingTracking * s.size.heading),
+          }),
+        ],
+      });
+    },
+
+    entry(item: CvLine, first: boolean): Paragraph {
+      const parts = item.parts;
+      const children = parts
+        ? [
+            run(parts.title, s.font.body, s.size.body, { bold: true }),
+            ...(parts.org ? [run(`, ${parts.org}`, s.font.body, s.size.body)] : []),
+            ...(parts.dates
+              ? [run(`\t${parts.dates}`, s.font.body, s.size.small, { color: hex(CV_MUTED) })]
+              : []),
+          ]
+        : [run(item.text, s.font.body, s.size.body, { bold: true })];
+      return new Paragraph({
+        keepNext: true,
+        tabStops: [{ type: TabStopType.RIGHT, position: contentWidth }],
+        spacing: { before: first ? 0 : twip(s.space.entry), after: twip(s.space.item), line },
+        children,
+      });
+    },
+
+    bullet(text: string): Paragraph {
+      return new Paragraph({
+        // A real Word list rather than a literal bullet character, which is
+        // what a parser expects to find.
+        bullet: { level: 0 },
+        spacing: { after: twip(s.space.item), line },
+        children: [run(text, s.font.body, s.size.body)],
+      });
+    },
+
+    paragraph(text: string, after = s.space.item): Paragraph {
+      return new Paragraph({
+        spacing: { after: twip(after), line },
+        children: [run(text, s.font.body, s.size.body)],
+      });
+    },
+
+    gap(): Paragraph {
+      return new Paragraph({ text: "", spacing: { after: twip(s.space.entry * 0.5), line: 120 } });
+    },
+  };
+}
+
+/** A one-section Word document with the template's page margins. */
+export function docxDocument(
+  docx: Docx,
+  s: ResolvedCvStyle,
+  title: string,
+  description: string,
+  children: Paragraph[],
+) {
+  return new docx.Document({
     creator: "Callback",
-    title: layout.name ? `${layout.name.text} — CV` : options.name ? `CV — ${options.name}` : "CV",
-    description: "Improved CV exported from Callback",
+    title,
+    description,
     styles: {
       default: {
         document: {
-          run: { font: FONT, size: SIZE.body },
-          paragraph: { spacing: { line: 264 } },
+          run: { font: WORD_FONT[s.font.body], size: half(s.size.body * WORD_SCALE[s.font.body]) },
         },
       },
     },
@@ -131,16 +190,57 @@ export async function buildCvDocx(
       {
         properties: {
           page: {
+            size: { width: twip(CV_PAGE.width), height: twip(CV_PAGE.height) },
             // Single column, no header or footer defined.
-            margin: { top: 720, bottom: 720, left: 800, right: 800 },
+            margin: {
+              top: twip(s.margin.y),
+              bottom: twip(s.margin.y),
+              left: twip(s.margin.x),
+              right: twip(s.margin.x),
+            },
           },
         },
         children,
       },
     ],
   });
+}
 
-  return Packer.toBlob(document);
+/**
+ * Build the .docx and hand it back as a Blob.
+ *
+ * `docx` is imported dynamically: it is a sizeable dependency that only
+ * matters the moment someone clicks download, and it has no business in the
+ * initial bundle of a page most visitors will only read.
+ */
+export async function buildCvDocx(
+  layout: CvLayout,
+  style: CvStyle,
+  options: CvDocxOptions = {},
+): Promise<Blob> {
+  const docx = await import("docx");
+  const s = resolveCvStyle(style);
+  const blocks = docxBlocks(docx, s);
+
+  const children: Paragraph[] = blocks.header(
+    layout.name?.text,
+    layout.headline?.text,
+    layout.contact.map((line) => line.text),
+  );
+
+  for (const section of layout.sections) {
+    children.push(blocks.heading(section.heading));
+    section.lines.forEach((line, index) => {
+      if (line.kind === "gap") children.push(blocks.gap());
+      else if (line.kind === "entry") children.push(blocks.entry(line, index === 0));
+      else if (line.kind === "bullet") children.push(blocks.bullet(line.text));
+      else children.push(blocks.paragraph(line.text));
+    });
+  }
+
+  const title = layout.name ? `${layout.name.text} — CV` : (options.title ?? "CV");
+  const document = docxDocument(docx, s, title, "Improved CV exported from Callback", children);
+  return docx.Packer.toBlob(document);
 }
 
 /** Trigger a browser download for a generated Blob. */
@@ -157,12 +257,16 @@ export function downloadBlob(blob: Blob, filename: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/** `alex-taylor-cv-product-analyst.docx` */
-export function cvFilename(jobTitle: string): string {
+/** `cv-product-analyst.pdf` */
+export function cvFilename(
+  jobTitle: string,
+  extension: "docx" | "pdf",
+  prefix = "cv",
+): string {
   const slug = jobTitle
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 40);
-  return slug.length > 0 ? `cv-${slug}.docx` : "cv-improved.docx";
+  return slug.length > 0 ? `${prefix}-${slug}.${extension}` : `${prefix}-improved.${extension}`;
 }
