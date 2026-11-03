@@ -11,7 +11,7 @@
  * the score. Templates differ only in type, colour and spacing.
  */
 
-export type CvTemplateId = "classic" | "modern" | "compact" | "elegant";
+export type CvTemplateId = "professional" | "classic" | "modern" | "compact" | "elegant";
 export type CvAccentId = "espresso" | "navy" | "teal" | "forest" | "plum" | "slate";
 export type CvDensity = "normal" | "compact";
 export type CvHeaderAlign = "center" | "left";
@@ -42,6 +42,8 @@ export type CvTemplate = {
   /** Name weight; the serif name in Elegant is deliberately light. */
   nameBold: boolean;
   nameInAccent: boolean;
+  /** Name and headline set in capitals, as many recruiter-ready CVs are. */
+  caps: boolean;
   /** The template's own header alignment; the user's choice overrides it. */
   header: CvHeaderAlign;
   heading: HeadingStyle;
@@ -58,6 +60,21 @@ export type CvTemplate = {
 };
 
 export const CV_TEMPLATES: Record<CvTemplateId, CvTemplate> = {
+  professional: {
+    id: "professional",
+    label: "Professional",
+    blurb: "Capitals header, ruled headings. The classic recruiter CV.",
+    font: { name: "sans", heading: "sans", body: "sans" },
+    nameBold: true,
+    nameInAccent: true,
+    caps: true,
+    header: "center",
+    heading: "rule",
+    headingTracking: 0.02,
+    size: { name: 22, heading: 10.5, body: 9.75, small: 9 },
+    space: { section: 13, afterHeading: 5, entry: 6, item: 2, line: 1.34 },
+    margin: { x: 46, y: 40 },
+  },
   classic: {
     id: "classic",
     label: "Classic",
@@ -65,6 +82,7 @@ export const CV_TEMPLATES: Record<CvTemplateId, CvTemplate> = {
     font: { name: "serif", heading: "serif", body: "serif" },
     nameBold: true,
     nameInAccent: false,
+    caps: false,
     header: "center",
     heading: "rule",
     headingTracking: 0.04,
@@ -79,6 +97,7 @@ export const CV_TEMPLATES: Record<CvTemplateId, CvTemplate> = {
     font: { name: "sans", heading: "sans", body: "sans" },
     nameBold: true,
     nameInAccent: true,
+    caps: false,
     header: "left",
     heading: "accent",
     headingTracking: 0.05,
@@ -93,6 +112,7 @@ export const CV_TEMPLATES: Record<CvTemplateId, CvTemplate> = {
     font: { name: "sans", heading: "sans", body: "sans" },
     nameBold: true,
     nameInAccent: false,
+    caps: false,
     header: "left",
     heading: "rule",
     headingTracking: 0.03,
@@ -107,6 +127,7 @@ export const CV_TEMPLATES: Record<CvTemplateId, CvTemplate> = {
     font: { name: "serif", heading: "sans", body: "sans" },
     nameBold: false,
     nameInAccent: false,
+    caps: false,
     header: "left",
     heading: "accent-rule",
     headingTracking: 0.05,
@@ -119,7 +140,7 @@ export const CV_TEMPLATES: Record<CvTemplateId, CvTemplate> = {
 /** The most tracking a heading may carry and still extract as one word. */
 export const MAX_HEADING_TRACKING = 0.05;
 
-export const CV_TEMPLATE_ORDER: CvTemplateId[] = ["modern", "classic", "compact", "elegant"];
+export const CV_TEMPLATE_ORDER: CvTemplateId[] = ["professional", "modern", "classic", "compact", "elegant"];
 
 /** Dark, print-safe accents: each holds at least 7:1 against white. */
 export const CV_ACCENTS: Record<CvAccentId, { label: string; hex: string }> = {
@@ -134,7 +155,7 @@ export const CV_ACCENTS: Record<CvAccentId, { label: string; hex: string }> = {
 export const CV_ACCENT_ORDER: CvAccentId[] = ["espresso", "navy", "teal", "forest", "plum", "slate"];
 
 export const DEFAULT_CV_STYLE: CvStyle = {
-  template: "modern",
+  template: "professional",
   accent: "navy",
   density: "normal",
   header: "center",
@@ -190,6 +211,19 @@ export function parseCvStyle(value: unknown): CvStyle {
     density: raw.density === "compact" ? "compact" : "normal",
     header: raw.header === "left" ? "left" : "center",
   };
+}
+
+/** A contact line in the header; profile links are set in the accent. */
+export type HeaderLine = { text: string; links?: boolean };
+
+/** Name and headline contrast: the headline takes whichever the name is not. */
+export function headlineColour(s: ResolvedCvStyle): string {
+  return s.nameInAccent ? CV_INK : s.accent;
+}
+
+/** Templates whose headings are ruled need no extra line under the header. */
+export function headerRule(s: ResolvedCvStyle): boolean {
+  return s.heading !== "rule";
 }
 
 export function hexToRgb(hex: string): [number, number, number] {

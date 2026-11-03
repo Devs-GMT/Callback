@@ -4,6 +4,8 @@ import type { CSSProperties, ReactNode } from "react";
 import type { CvLayout, CvLine } from "@/lib/analysis/cv-layout";
 import {
   CV_HAIRLINE,
+  headerRule,
+  headlineColour,
   CV_INK,
   CV_MUTED,
   CV_PAGE,
@@ -86,9 +88,13 @@ export function CvHeader({
     <header
       style={{
         textAlign: align,
-        paddingBottom: pt(s.space.section * 0.55),
-        borderBottom: `${pt(0.6)} solid ${CV_HAIRLINE}`,
-        marginBottom: pt(s.space.section * 0.15),
+        ...(headerRule(s)
+          ? {
+              paddingBottom: pt(s.space.section * 0.55),
+              borderBottom: `${pt(0.6)} solid ${CV_HAIRLINE}`,
+              marginBottom: pt(s.space.section * 0.15),
+            }
+          : { marginBottom: pt(s.space.section * 0.2) }),
       }}
     >
       {name ? (
@@ -100,6 +106,7 @@ export function CvHeader({
             lineHeight: 1.12,
             letterSpacing: s.font.name === "sans" ? "-0.01em" : undefined,
             color: s.nameInAccent ? s.accent : CV_INK,
+            textTransform: s.caps ? "uppercase" : undefined,
             marginBottom: pt(s.size.name * 0.28),
           }}
         >
@@ -111,7 +118,8 @@ export function CvHeader({
           style={{
             fontSize: pt(s.size.body + 1.5),
             fontWeight: 600,
-            color: s.accent,
+            color: headlineColour(s),
+            textTransform: s.caps ? "uppercase" : undefined,
             marginBottom: pt(3),
           }}
         >
@@ -119,7 +127,7 @@ export function CvHeader({
         </p>
       ) : null}
       {lines.map((line, index) => (
-        <p key={index} style={{ fontSize: pt(s.size.small), color: CV_MUTED }}>
+        <p key={index} style={{ fontSize: pt(s.size.small), color: line.links ? s.accent : CV_MUTED }}>
           <span {...changedProps(line)}>{line.text}</span>
         </p>
       ))}

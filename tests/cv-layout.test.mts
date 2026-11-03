@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { layoutCv, layoutText, layoutToText, splitEntry } from "@/lib/analysis/cv-layout";
+import { isHeading, layoutCv, layoutText, layoutToText, splitEntry } from "@/lib/analysis/cv-layout";
 import { computeAts } from "@/lib/analysis/ats";
 import { CV_TEMPLATES, MAX_HEADING_TRACKING } from "@/lib/cv-templates";
 
@@ -36,19 +36,19 @@ describe("layoutCv", () => {
     assert.equal(layout.name?.text, "Jane Doe");
     assert.deepEqual(
       layout.contact.map((line) => line.text),
-      ["jane@example.com  |  +44 7700 900123  |  linkedin.com/in/janedoe"],
+      ["jane@example.com  •  +44 7700 900123", "linkedin.com/in/janedoe"],
     );
   });
 
   it("gives an unlabelled opening paragraph a Profile heading", () => {
-    assert.equal(layout.sections[0].heading, "PROFILE");
+    assert.equal(layout.sections[0].heading, "PROFESSIONAL SUMMARY");
     assert.equal(layout.sections[0].lines[0].text, "Analyst who turns messy data into decisions.");
   });
 
   it("upper-cases headings and splits inline ones", () => {
     assert.deepEqual(
       layout.sections.map((section) => section.heading),
-      ["PROFILE", "EXPERIENCE", "EDUCATION", "SKILLS"],
+      ["PROFESSIONAL SUMMARY", "EXPERIENCE", "EDUCATION", "SKILLS"],
     );
     const skills = layout.sections.find((section) => section.heading === "SKILLS");
     assert.equal(skills?.lines[0].text, "SQL, Python, Tableau, Excel");
@@ -125,6 +125,31 @@ describe("layoutCv", () => {
 });
 
 describe("layoutCv header", () => {
+  it("reads a qualified heading like Web3 Projects, but not a sentence", () => {
+    assert.equal(isHeading("Web3 Projects"), true);
+    assert.equal(isHeading("Relevant Experience"), true);
+    assert.equal(isHeading("Led several projects"), false);
+  });
+
+  it("splits an existing contact line and puts profile links on their own line", () => {
+    const result = layoutText(
+      `Bayu Putra
+Backend Developer
+Yogyakarta, Indonesia • 0878 0247 3448 • bayu@example.com
+linkedin.com/in/bayu | github.com/bayu
+
+EXPERIENCE
+- Built things`,
+    );
+    assert.deepEqual(
+      result.contact.map((line) => [line.text, Boolean(line.links)]),
+      [
+        ["Yogyakarta, Indonesia  •  0878 0247 3448  •  bayu@example.com", false],
+        ["linkedin.com/in/bayu  •  github.com/bayu", true],
+      ],
+    );
+  });
+
   it("separates the headline and folds the city into the contact line", () => {
     const result = layoutText(`Alex Taylor
 Junior Data Analyst
@@ -137,7 +162,7 @@ EXPERIENCE
     assert.equal(result.headline?.text, "Junior Data Analyst");
     assert.deepEqual(
       result.contact.map((line) => line.text),
-      ["London, UK  |  alex@example.com  |  +44 7700 900123"],
+      ["London, UK  •  alex@example.com  •  +44 7700 900123"],
     );
     assert.ok(
       layoutToText(result).startsWith(`Alex Taylor

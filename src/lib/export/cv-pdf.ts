@@ -15,6 +15,9 @@
 import type { CvLayout, CvLine } from "@/lib/analysis/cv-layout";
 import {
   CV_HAIRLINE,
+  headerRule,
+  headlineColour,
+  type HeaderLine,
   CV_INK,
   CV_MUTED,
   CV_PAGE,
@@ -154,7 +157,7 @@ export class CvPdfWriter {
   }
 
   /** Name, headline, then contact lines, left or centred per template. */
-  header(name: string | undefined, headline: string | undefined, lines: string[]): void {
+  header(name: string | undefined, headline: string | undefined, lines: HeaderLine[]): void {
     const s = this.s;
     const centre = s.header === "center";
     const x = centre ? CV_PAGE.width / 2 : this.x;
@@ -162,7 +165,7 @@ export class CvPdfWriter {
 
     if (name) {
       this.font(s.font.name, s.nameBold ? "bold" : "normal", s.size.name, s.nameInAccent ? s.accent : CV_INK);
-      const wrapped = this.wrap(name, this.width);
+      const wrapped = this.wrap(s.caps ? name.toUpperCase() : name, this.width);
       const height = wrapped.length * s.size.name * 1.12;
       this.doc.setLineHeightFactor(1.12);
       this.draw(wrapped, x, this.reserve(height), align);
@@ -172,24 +175,29 @@ export class CvPdfWriter {
 
     if (headline) {
       const size = s.size.body + 1.5;
-      this.font(s.font.body, "bold", size, s.accent);
-      const wrapped = this.wrap(headline, this.width);
+      this.font(s.font.body, "bold", size, headlineColour(s));
+      const wrapped = this.wrap(s.caps ? headline.toUpperCase() : headline, this.width);
       this.draw(wrapped, x, this.reserve(wrapped.length * this.lineHeight(size)), align);
       this.gap(3);
     }
 
     for (const line of lines) {
-      this.font(s.font.body, "normal", s.size.small, CV_MUTED);
-      const wrapped = this.wrap(line, this.width);
+      this.font(s.font.body, "normal", s.size.small, line.links ? s.accent : CV_MUTED);
+      const wrapped = this.wrap(line.text, this.width);
       this.draw(wrapped, x, this.reserve(wrapped.length * this.lineHeight(s.size.small)), align);
     }
 
-    // A hairline closes the header off from the first section.
-    this.gap(s.space.section * 0.55);
-    this.doc.setDrawColor(...hexToRgb(CV_HAIRLINE));
-    this.doc.setLineWidth(0.6);
-    this.doc.line(this.x, this.y, this.x + this.width, this.y);
-    this.gap(s.space.section * 0.15);
+    // A hairline closes the header off from the first section, unless the
+    // headings carry their own rule.
+    if (headerRule(s)) {
+      this.gap(s.space.section * 0.55);
+      this.doc.setDrawColor(...hexToRgb(CV_HAIRLINE));
+      this.doc.setLineWidth(0.6);
+      this.doc.line(this.x, this.y, this.x + this.width, this.y);
+      this.gap(s.space.section * 0.15);
+    } else {
+      this.gap(s.space.section * 0.2);
+    }
   }
 
   heading(text: string): void {
@@ -331,7 +339,7 @@ export async function buildCvPdf(
   writer.header(
     layout.name?.text,
     layout.headline?.text,
-    layout.contact.map((line) => line.text),
+    layout.contact,
   );
   for (const section of layout.sections) {
     writer.heading(section.heading);

@@ -17,6 +17,9 @@
 import type { CvLayout, CvLine } from "@/lib/analysis/cv-layout";
 import {
   CV_HAIRLINE,
+  headerRule,
+  headlineColour,
+  type HeaderLine,
   CV_INK,
   CV_MUTED,
   CV_PAGE,
@@ -61,7 +64,7 @@ export function docxBlocks(docx: Docx, s: ResolvedCvStyle) {
   return {
     contentWidth,
 
-    header(name: string | undefined, headline: string | undefined, lines: string[]): Paragraph[] {
+    header(name: string | undefined, headline: string | undefined, lines: HeaderLine[]): Paragraph[] {
       type Block = { runs: InstanceType<Docx["TextRun"]>[]; after: number; title?: boolean };
       const blocks: Block[] = [];
       if (name) {
@@ -69,7 +72,7 @@ export function docxBlocks(docx: Docx, s: ResolvedCvStyle) {
           title: true,
           after: twip(s.size.name * 0.25),
           runs: [
-            run(name, s.font.name, s.size.name, {
+            run(s.caps ? name.toUpperCase() : name, s.font.name, s.size.name, {
               bold: s.nameBold,
               color: hex(s.nameInAccent ? s.accent : CV_INK),
             }),
@@ -79,25 +82,34 @@ export function docxBlocks(docx: Docx, s: ResolvedCvStyle) {
       if (headline) {
         blocks.push({
           after: twip(3),
-          runs: [run(headline, s.font.body, s.size.body + 1.5, { bold: true, color: hex(s.accent) })],
+          runs: [
+            run(s.caps ? headline.toUpperCase() : headline, s.font.body, s.size.body + 1.5, {
+              bold: true,
+              color: hex(headlineColour(s)),
+            }),
+          ],
         });
       }
-      for (const text of lines) {
-        blocks.push({ after: 0, runs: [run(text, s.font.body, s.size.small, { color: hex(CV_MUTED) })] });
+      for (const line of lines) {
+        blocks.push({
+          after: 0,
+          runs: [run(line.text, s.font.body, s.size.small, { color: hex(line.links ? s.accent : CV_MUTED) })],
+        });
       }
 
       // A hairline under the last header line closes it off from the first
-      // section, as in the preview and the PDF.
+      // section, as in the preview and the PDF, unless headings are ruled.
+      const ruled = headerRule(s);
       return blocks.map((block, index) => {
         const last = index === blocks.length - 1;
         return new Paragraph({
           heading: block.title ? HeadingLevel.TITLE : undefined,
           alignment: align,
           spacing: {
-            after: last ? twip(s.space.section * 0.15) : block.after,
+            after: last ? twip(s.space.section * (ruled ? 0.15 : 0.2)) : block.after,
             line: block.title ? 240 : line,
           },
-          border: last
+          border: last && ruled
             ? {
                 bottom: {
                   style: BorderStyle.SINGLE,
@@ -246,7 +258,7 @@ export async function buildCvDocx(
   const children: Paragraph[] = blocks.header(
     layout.name?.text,
     layout.headline?.text,
-    layout.contact.map((line) => line.text),
+    layout.contact,
   );
 
   for (const section of layout.sections) {

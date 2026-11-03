@@ -42,6 +42,8 @@ export type CvLine = {
   replaced?: string;
   /** Only on `entry` lines. */
   parts?: CvEntryParts;
+  /** A header line of profile links, set in the accent colour. */
+  links?: boolean;
 };
 
 export type CvSection = {
@@ -66,6 +68,13 @@ const SECTION_NAMES =
 /** A line that is only a known section name, optionally with a colon. */
 const KNOWN_HEADING = new RegExp(`^(?:${SECTION_NAMES})\\s*:?\\s*$`, "i");
 
+/**
+ * "Web3 Projects", "Relevant Experience", "Technical Skills": a section word
+ * after one or two capitalised qualifiers.
+ */
+const QUALIFIED_HEADING =
+  /^(?:\S+\s+){1,2}(?:projects|experience|skills|certifications?|courses|awards|achievements|publications)\s*:?\s*$/i;
+
 /** "Skills: SQL, Python" — a known section name with its content inline. */
 const INLINE_HEADING = new RegExp(`^(${SECTION_NAMES})\\s*:\\s*(.+)$`, "i");
 
@@ -73,6 +82,15 @@ export const BULLET_MARKER = /^\s*(?:[-–—•·*▪◦‣]|\d{1,2}[.)])\s+/;
 
 const CONTACT_HINT =
   /@|https?:\/\/|www\.|linkedin|github|portfolio|\+?\d[\d\s().-]{6,}\d/i;
+
+/** A profile link: LinkedIn, GitHub, a portfolio or any bare web address. */
+const PROFILE_LINK = /https?:\/\/|www\.|linkedin|github|gitlab|behance|dribbble|portfolio|^[\w-]+(?:\.[\w-]+)+\/\S*$/i;
+
+/** Separators people already put between contact details on one line. */
+const CONTACT_SEPARATOR = /\s+[|•·]\s+|\s{3,}|\t+/;
+
+/** How contact details are joined on the printed line. */
+export const CONTACT_JOIN = "  •  ";
 
 /** "London, UK" or "Jakarta Selatan, Indonesia": a place, not a headline. */
 const LOCATION = /^[\p{L}][\p{L} .'’-]*,\s*[\p{L}][\p{L} .'’-]*$/u;
@@ -131,6 +149,12 @@ export function isHeading(line: string): boolean {
   if (trimmed.length === 0 || trimmed.length > 48) return false;
   if (BULLET_MARKER.test(line)) return false;
   if (KNOWN_HEADING.test(trimmed)) return true;
+  if (
+    QUALIFIED_HEADING.test(trimmed) &&
+    trimmed.split(/\s+/).every((word) => /^[\p{Lu}\d]/u.test(word))
+  ) {
+    return true;
+  }
 
   // A short all-caps line with no sentence punctuation is a heading too.
   const letters = trimmed.replace(/[^\p{L}]/gu, "");
@@ -239,20 +263,24 @@ export function layoutCv(segments: CvSegment[]): CvLayout {
   );
   const contact: CvLine[] = remaining.filter((line) => !joinable(line));
   if (contactBits.length > 0) {
-    // One "city | email | phone | link" line is what most parsers and
-    // recruiters expect, and it saves the vertical space a stacked block wastes.
-    contact.push({
-      kind: "text",
-      text: contactBits.map((line) => line.text).join("  |  "),
-      changed: contactBits.some((line) => line.changed),
-    });
+    // One "city • phone • email" line, then the profile links on their own
+    // line, is what most parsers and recruiters expect, and it saves the
+    // vertical space a stacked block wastes.
+    const changed = contactBits.some((line) => line.changed);
+    const bits = contactBits.flatMap((line) =>
+      line.text.split(CONTACT_SEPARATOR).map((bit) => bit.trim()).filter(Boolean),
+    );
+    const details = bits.filter((bit) => !PROFILE_LINK.test(bit) || bit.includes("@"));
+    const links = bits.filter((bit) => PROFILE_LINK.test(bit) && !bit.includes("@"));
+    if (details.length > 0) contact.push({ kind: "text", text: details.join(CONTACT_JOIN), changed });
+    if (links.length > 0) contact.push({ kind: "text", text: links.join(CONTACT_JOIN), changed, links: true });
   }
 
   const sections: CvSection[] = [];
   const profileLines = tidy(profile);
   if (profileLines.length > 0) {
     sections.push({
-      heading: "PROFILE",
+      heading: "PROFESSIONAL SUMMARY",
       changed: profileLines.some((line) => line.changed),
       lines: profileLines,
     });

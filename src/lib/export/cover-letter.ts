@@ -41,7 +41,7 @@ export async function buildCoverLetterPdf(input: LetterExport): Promise<Blob> {
   writer.header(
     input.layout.name?.text,
     input.layout.headline?.text,
-    input.layout.contact.map((line) => line.text),
+    input.layout.contact,
   );
   writer.gap(s.space.section);
   writer.small(input.date);
@@ -67,7 +67,7 @@ export async function buildCoverLetterDocx(input: LetterExport): Promise<Blob> {
   const children = blocks.header(
     input.layout.name?.text,
     input.layout.headline?.text,
-    input.layout.contact.map((line) => line.text),
+    input.layout.contact,
   );
   children.push(blocks.small(input.date, s.space.section * 0.6));
   input.recipient.forEach((line, index) => {
