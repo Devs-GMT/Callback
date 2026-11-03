@@ -21,6 +21,8 @@ export type CvLineKind =
   | "bullet"
   /** A role, degree or project line that introduces the bullets under it. */
   | "entry"
+  /** The job title on its own line under an employer entry, set in italics. */
+  | "subtitle"
   /** A paragraph break worth keeping, such as between two jobs. */
   | "gap";
 
@@ -30,6 +32,8 @@ export type CvLineKind =
  * original string; this is a reading of it, not a replacement.
  */
 export type CvEntryParts = {
+  /** "|" when the CV split role and organisation with a pipe, kept on print. */
+  separator?: "|";
   title: string;
   org?: string;
   dates?: string;
@@ -112,8 +116,22 @@ const TRAILING_DATES = new RegExp(
   "i",
 );
 
+/**
+ * A whole date range after a single space: "Indonesia Mar 2026 – Jun 2026".
+ * Only a full range qualifies, so "Graduated in 2020" stays prose.
+ */
+const TRAILING_RANGE = new RegExp(
+  `\\s+((?:${DATE})\\s*(?:-|–|—|to|until|sampai|hingga|s\\.?d\\.?)\\s*(?:${DATE}|${PRESENT}))\\s*$`,
+  "i",
+);
+
 /** Between role and organisation, in the order they are trusted. */
-const ENTRY_SEPARATORS = [/\s+\|\s+/, /\s+[–—]\s+/, /\s+-\s+/, /\s*,\s+/, /\s+at\s+/i, /\s+di\s+/i];
+const ENTRY_SEPARATORS = [/\s*\|\s*/, /\s+[–—]\s+/, /\s+-\s+/, /\s*,\s+/, /\s+at\s+/i, /\s+di\s+/i];
+
+/** What sits between the title and the organisation on print. */
+export function orgPrefix(parts: CvEntryParts): string {
+  return parts.separator === "|" ? " | " : ", ";
+}
 
 /**
  * Read "Data Analyst, Acme Retail, 2021 - 2024" into title, org and dates.
@@ -125,7 +143,7 @@ export function splitEntry(text: string): CvEntryParts | undefined {
   let rest = trimmed;
   let dates: string | undefined;
 
-  const match = trimmed.match(TRAILING_DATES);
+  const match = trimmed.match(TRAILING_RANGE) ?? trimmed.match(TRAILING_DATES);
   if (match && match.index !== undefined && match.index > 0) {
     dates = match[1].replace(/\s*(-|–|—)\s*/, " – ").replace(/\s+/g, " ");
     rest = trimmed.slice(0, match.index).replace(/[\s,|·•–—-]+$/, "");
@@ -137,7 +155,11 @@ export function splitEntry(text: string): CvEntryParts | undefined {
     if (at > 0) {
       const sep = rest.slice(at).match(separator)?.[0] ?? "";
       const org = rest.slice(at + sep.length).trim();
-      if (org.length > 0) return { title: rest.slice(0, at).trim(), org, dates };
+      if (org.length > 0) {
+        const parts: CvEntryParts = { title: rest.slice(0, at).trim(), org, dates };
+        if (sep.includes("|")) parts.separator = "|";
+        return parts;
+      }
     }
   }
   return dates ? { title: rest, dates } : undefined;
@@ -149,6 +171,8 @@ export function isHeading(line: string): boolean {
   if (trimmed.length === 0 || trimmed.length > 48) return false;
   if (BULLET_MARKER.test(line)) return false;
   if (KNOWN_HEADING.test(trimmed)) return true;
+  // "GPA: 3.81/4.00" is a label with its value, not a heading.
+  if (/:\s*\S/.test(trimmed)) return false;
   if (
     QUALIFIED_HEADING.test(trimmed) &&
     trimmed.split(/\s+/).every((word) => /^[\p{Lu}\d]/u.test(word))
@@ -195,11 +219,41 @@ function classify(segment: CvSegment): Part[] {
   return [{ line: { kind: "text", text: trimmed.replace(/\s+/g, " "), ...base } }];
 }
 
-/** Drop leading, trailing and repeated gaps, and mark entry lines. */
+/**
+ * Is `next` the rest of `previous`, broken only by the width of the page the
+ * text was copied from? PDFs hard-wrap every line, so a bullet often arrives
+ * as two: "…tokenization and on-chain" then "workflows.".
+ */
+function continues(previous: CvLine, next: CvLine): boolean {
+  if (next.kind !== "text" || (previous.kind !== "text" && previous.kind !== "bullet")) return false;
+  if (/[\p{L}\d]-$/u.test(previous.text)) return true;
+  if (/[.!?:]$/.test(previous.text)) return false;
+  if (/^\p{Ll}/u.test(next.text)) return true;
+  // A long line stopped mid-phrase was wrapped by the page, even when the next
+  // word is capitalised: "…Decentralized Systems, Database" / "Systems, …".
+  return previous.text.length >= 95 && splitEntry(next.text)?.dates === undefined;
+}
+
+function join(previous: CvLine, next: CvLine): CvLine {
+  // "full-" + "stack" stays "full-stack"; anything else joins with a space.
+  const glue = /[\p{L}\d]-$/u.test(previous.text) ? "" : " ";
+  return {
+    ...previous,
+    text: `${previous.text}${glue}${next.text}`,
+    changed: previous.changed || next.changed,
+  };
+}
+
+/** Drop leading, trailing and repeated gaps, rejoin wrapped lines, and mark entries. */
 function tidy(lines: CvLine[]): CvLine[] {
   const out: CvLine[] = [];
   for (const line of lines) {
     if (line.kind === "gap" && (out.length === 0 || out[out.length - 1].kind === "gap")) {
+      continue;
+    }
+    const last = out[out.length - 1];
+    if (last && continues(last, line)) {
+      out[out.length - 1] = join(last, line);
       continue;
     }
     out.push(line);
@@ -210,12 +264,26 @@ function tidy(lines: CvLine[]): CvLine[] {
   // Acme Retail, 2021 to 2024". Making it an entry lets it be set in bold. A
   // short line ending in dates is one too, even with no bullets under it, which
   // is how most education lines look.
-  return out.map((line, index) => {
+  const marked = out.map((line, index): CvLine => {
     if (line.kind !== "text" || line.text.length > 120) return line;
     const parts = splitEntry(line.text);
     const introducesBullets = out[index + 1]?.kind === "bullet";
     const datedLine = parts?.dates !== undefined && !/[.!?;]$/.test(line.text);
     return introducesBullets || datedLine ? { ...line, kind: "entry", parts } : line;
+  });
+
+  // "PT Javas Technology | Yogyakarta   Mar 2026 – Jun 2026" over "Full-Stack
+  // Developer Intern": the second line is the job title, not a second entry.
+  return marked.map((line, index) => {
+    const above = marked[index - 1];
+    const isTitle =
+      line.kind === "entry" &&
+      line.parts?.dates === undefined &&
+      line.text.length <= 70 &&
+      !/[|,:;]/.test(line.text) &&
+      above?.kind === "entry" &&
+      above.parts?.dates !== undefined;
+    return isTitle ? { ...line, kind: "subtitle", parts: undefined } : line;
   });
 }
 

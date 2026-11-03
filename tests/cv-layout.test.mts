@@ -212,7 +212,25 @@ describe("splitEntry", () => {
   const cases: Array<[string, ReturnType<typeof splitEntry>]> = [
     [
       "Senior Engineer | Stripe | Jan 2021 – Present",
-      { title: "Senior Engineer", org: "Stripe", dates: "Jan 2021 – Present" },
+      { title: "Senior Engineer", org: "Stripe", dates: "Jan 2021 – Present", separator: "|" },
+    ],
+    [
+      "PT Javas Technology| Yogyakarta, Indonesia Mar 2026 – Jun 2026",
+      {
+        title: "PT Javas Technology",
+        org: "Yogyakarta, Indonesia",
+        dates: "Mar 2026 – Jun 2026",
+        separator: "|",
+      },
+    ],
+    [
+      "Universitas Teknologi Digital Indonesia | B.Sc. in Informatics Sep 2024 - Present",
+      {
+        title: "Universitas Teknologi Digital Indonesia",
+        org: "B.Sc. in Informatics",
+        dates: "Sep 2024 – Present",
+        separator: "|",
+      },
     ],
     [
       "Product Analyst at Gojek (Mar 2020 - Jun 2022)",
@@ -236,5 +254,41 @@ describe("splitEntry", () => {
 
   it("leaves prose that ends on a year alone", () => {
     assert.equal(splitEntry("Graduated in 2020")?.dates, undefined);
+  });
+});
+
+describe("text copied from a PDF", () => {
+  const CV = `JANE DOE
+jane@example.com
+WORK EXPERIENCE
+PT Javas Technology | Yogyakarta, Indonesia Mar 2026 – Jun 2026
+Full-Stack Developer Intern
+• Contributed to the New Scholaria platform by implementing new features and improving
+existing modules.
+EDUCATION
+Universitas Teknologi Digital Indonesia | B.Sc. in Informatics Sep 2024 - Present
+GPA: 3.81/4.00
+Relevant Courses : Object-Oriented Programming, Web Client Programming, Distributed and Decentralized Systems, Database
+Systems, Data Structures.`;
+  const layout = layoutText(CV);
+  const [work, education] = layout.sections;
+
+  it("rejoins lines the page wrapped", () => {
+    assert.equal(
+      work.lines.at(-1)?.text,
+      "Contributed to the New Scholaria platform by implementing new features and improving existing modules.",
+    );
+    assert.match(education.lines.at(-1)?.text ?? "", /Database Systems, Data Structures\.$/);
+  });
+
+  it("sets the job title under the employer as a subtitle", () => {
+    assert.deepEqual(
+      work.lines.map((line) => line.kind),
+      ["entry", "subtitle", "bullet"],
+    );
+  });
+
+  it("keeps a label with a value, like GPA, out of the headings", () => {
+    assert.deepEqual(layout.sections.map((section) => section.heading), ["WORK EXPERIENCE", "EDUCATION"]);
   });
 });

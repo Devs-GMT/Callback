@@ -12,7 +12,7 @@
  * type, so the two documents match when sent together.
  */
 
-import type { CvLayout, CvLine } from "@/lib/analysis/cv-layout";
+import { orgPrefix, type CvLayout, type CvLine } from "@/lib/analysis/cv-layout";
 import {
   CV_HAIRLINE,
   headerRule,
@@ -252,7 +252,7 @@ export class CvPdfWriter {
 
     this.font(s.font.body, "bold", size, CV_INK);
     const titleWidth = this.doc.getTextWidth(parts.title);
-    const org = parts.org ? `, ${parts.org}` : "";
+    const org = parts.org ? `${orgPrefix(parts)}${parts.org}` : "";
     this.font(s.font.body, "normal", size, CV_INK);
     const orgWidth = org ? this.doc.getTextWidth(org) : 0;
 
@@ -307,6 +307,15 @@ export class CvPdfWriter {
     this.draw(wrapped, this.x, this.reserve(wrapped.length * this.lineHeight(s.size.body)));
   }
 
+  /** The job title under an employer entry: italic, muted, no gap above. */
+  subtitle(text: string): void {
+    const s = this.s;
+    this.sectionStart = false;
+    this.font(s.font.body, "italic", s.size.body, CV_MUTED);
+    const wrapped = this.wrap(text, this.width);
+    this.draw(wrapped, this.x, this.reserve(wrapped.length * this.lineHeight(s.size.body)));
+  }
+
   /** A small muted line, such as the date on a letter. */
   small(text: string, options: { gap?: number } = {}): void {
     const s = this.s;
@@ -322,6 +331,7 @@ export class CvPdfWriter {
       if (line.kind === "gap") this.gap(this.s.space.entry * 0.5);
       else if (line.kind === "entry") this.entry(line);
       else if (line.kind === "bullet") this.bullet(line.text);
+      else if (line.kind === "subtitle") this.subtitle(line.text);
       else this.paragraph(line.text);
     }
   }

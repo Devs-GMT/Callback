@@ -18,6 +18,7 @@
  *   - `gap`, which is advice about what to go and do, not CV text.
  */
 
+import { isHeading } from "@/lib/analysis/cv-layout";
 import type { Suggestion, SuggestionDecision } from "@/lib/types";
 
 export type CvSegment = {
@@ -70,15 +71,17 @@ function findLine(lines: string[], before: string, taken: Set<number>): number {
   const needle = normaliseForMatch(before);
   if (needle.length === 0) return -1;
 
+  // Headings are structure, not content: a suggestion never rewrites, cuts or
+  // moves one, or the sections around it lose their label.
   for (let i = 0; i < lines.length; i += 1) {
-    if (taken.has(i)) continue;
+    if (taken.has(i) || isHeading(lines[i])) continue;
     if (normaliseForMatch(lines[i]) === needle) return i;
   }
 
   // Only fall back for quotes long enough that containment is meaningful.
   if (needle.length >= 25) {
     for (let i = 0; i < lines.length; i += 1) {
-      if (taken.has(i)) continue;
+      if (taken.has(i) || isHeading(lines[i])) continue;
       const candidate = normaliseForMatch(lines[i]);
       // A blank or near-blank line must not match: `needle.includes("")` is
       // always true, so without this floor every quote would anchor to the
@@ -94,32 +97,46 @@ function findLine(lines: string[], before: string, taken: Set<number>): number {
 const SUMMARY_HEADING =
   /^\s*(summary|professional\s+summary|profile|about\s+me|objective|career\s+objective|personal\s+statement)\s*:?\s*$/i;
 
+/** The heading a new summary gets when the CV has none. */
+const NEW_SUMMARY_HEADING = "PROFESSIONAL SUMMARY";
+
 /**
  * Where a new summary belongs: replacing the body under an existing summary
- * heading, or directly after the contact block when there is no heading.
+ * heading, or, when there is none, under a new heading placed just before the
+ * first section, which is where the header ends.
  */
-function summaryTarget(lines: string[]): { insertAt: number; replaceCount: number } {
+function summaryTarget(lines: string[]): {
+  insertAt: number;
+  replaceCount: number;
+  needsHeading: boolean;
+} {
   const headingIndex = lines.findIndex((line) => SUMMARY_HEADING.test(line));
 
   if (headingIndex !== -1) {
-    // Replace every line until the next blank line or heading-like line.
-    let end = headingIndex + 1;
-    while (
-      end < lines.length &&
-      lines[end].trim().length > 0 &&
-      !SUMMARY_HEADING.test(lines[end])
-    ) {
+    // Replace the summary body: every line up to the next section heading.
+    // Text copied from a PDF rarely has blank lines between sections, so a
+    // blank line alone is not a safe end — stopping only there once replaced
+    // the whole rest of the CV.
+    let start = headingIndex + 1;
+    while (start < lines.length && lines[start].trim().length === 0) start += 1;
+    let end = start;
+    while (end < lines.length && lines[end].trim().length > 0 && !isHeading(lines[end])) {
       end += 1;
     }
-    return { insertAt: headingIndex + 1, replaceCount: end - (headingIndex + 1) };
+    return { insertAt: start, replaceCount: end - start, needsHeading: false };
   }
 
-  // No heading: sit after the opening block, which on most CVs is the name and
-  // contact details. The first blank line is a good proxy for its end.
+  const firstSection = lines.findIndex((line, index) => index > 0 && isHeading(line));
+  if (firstSection !== -1) {
+    return { insertAt: firstSection, replaceCount: 0, needsHeading: true };
+  }
+
+  // No headings at all: after the opening block, up to the first blank line.
   const firstBlank = lines.findIndex((line) => line.trim().length === 0);
   return {
     insertAt: firstBlank === -1 ? 0 : firstBlank + 1,
     replaceCount: 0,
+    needsHeading: false,
   };
 }
 
@@ -172,7 +189,7 @@ export function applySuggestions(
       operations.push({
         kind: "insert",
         index: target.insertAt,
-        text: suggestion.after,
+        text: target.needsHeading ? `${NEW_SUMMARY_HEADING}\n${suggestion.after}` : suggestion.after,
         suggestionId: suggestion.id,
       });
       continue;

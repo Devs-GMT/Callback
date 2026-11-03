@@ -693,3 +693,51 @@ describe("applySuggestions", () => {
     );
   });
 });
+
+describe("applySuggestions on text copied from a PDF", () => {
+  // No blank lines between sections, as most PDF extractions come out.
+  const PDF_CV = `JANE DOE
+jane@example.com
+PROFESSIONAL SUMMARY
+Old summary, first line
+and its wrapped second line.
+WORK EXPERIENCE
+Engineer | Acme | 2021 - 2024
+- Built the billing service`;
+
+  const summary = (after: string): Suggestion => ({
+    id: "s1",
+    kind: "summary",
+    title: "New summary",
+    after,
+    rationale: "",
+  });
+
+  it("replaces only the summary body, never the sections below it", () => {
+    const { text } = applySuggestions(PDF_CV, [summary("New summary.")], { s1: "accepted" });
+    assert.ok(!text.includes("Old summary"));
+    assert.ok(text.includes("New summary."));
+    assert.ok(text.includes("WORK EXPERIENCE"));
+    assert.ok(text.includes("- Built the billing service"));
+  });
+
+  it("adds a heading for a new summary when the CV has none", () => {
+    const cv = PDF_CV.replace(/PROFESSIONAL SUMMARY\n.*\n.*\n/, "");
+    const { text } = applySuggestions(cv, [summary("New summary.")], { s1: "accepted" });
+    assert.match(text, /jane@example\.com\nPROFESSIONAL SUMMARY\nNew summary\.\nWORK EXPERIENCE/);
+  });
+
+  it("never rewrites a heading", () => {
+    const rewrite: Suggestion = {
+      id: "r1",
+      kind: "rewrite",
+      title: "Rename",
+      before: "WORK EXPERIENCE",
+      after: "EXPERIENCE",
+      rationale: "",
+    };
+    const { text, unapplied } = applySuggestions(PDF_CV, [rewrite], { r1: "accepted" });
+    assert.ok(text.includes("WORK EXPERIENCE"));
+    assert.equal(unapplied.length, 1);
+  });
+});

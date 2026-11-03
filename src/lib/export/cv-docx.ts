@@ -14,7 +14,7 @@
  * font only makes the file larger.
  */
 
-import type { CvLayout, CvLine } from "@/lib/analysis/cv-layout";
+import { orgPrefix, type CvLayout, type CvLine } from "@/lib/analysis/cv-layout";
 import {
   CV_HAIRLINE,
   headerRule,
@@ -156,7 +156,7 @@ export function docxBlocks(docx: Docx, s: ResolvedCvStyle) {
       const children = parts
         ? [
             run(parts.title, s.font.body, s.size.body, { bold: true }),
-            ...(parts.org ? [run(`, ${parts.org}`, s.font.body, s.size.body)] : []),
+            ...(parts.org ? [run(`${orgPrefix(parts)}${parts.org}`, s.font.body, s.size.body)] : []),
             ...(parts.dates
               ? [run(`\t${parts.dates}`, s.font.body, s.size.small, { color: hex(CV_MUTED) })]
               : []),
@@ -184,6 +184,14 @@ export function docxBlocks(docx: Docx, s: ResolvedCvStyle) {
       return new Paragraph({
         spacing: { after: twip(after), line },
         children: [run(text, s.font.body, s.size.body, { bold })],
+      });
+    },
+
+    subtitle(text: string): Paragraph {
+      return new Paragraph({
+        keepNext: true,
+        spacing: { after: twip(s.space.item), line },
+        children: [run(text, s.font.body, s.size.body, { italics: true, color: hex(CV_MUTED) })],
       });
     },
 
@@ -267,6 +275,7 @@ export async function buildCvDocx(
       if (line.kind === "gap") children.push(blocks.gap());
       else if (line.kind === "entry") children.push(blocks.entry(line, index === 0));
       else if (line.kind === "bullet") children.push(blocks.bullet(line.text));
+      else if (line.kind === "subtitle") children.push(blocks.subtitle(line.text));
       else children.push(blocks.paragraph(line.text));
     });
   }

@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
-import type { CvLayout, CvLine } from "@/lib/analysis/cv-layout";
+import { orgPrefix, type CvLayout, type CvLine } from "@/lib/analysis/cv-layout";
 import {
   CV_HAIRLINE,
   headerRule,
@@ -196,6 +196,13 @@ export function CvLines({ s, lines }: { s: ResolvedCvStyle; lines: CvLine[] }) {
         if (block.kind === "entry") {
           return <CvEntry key={index} s={s} line={block} first={index === 0} />;
         }
+        if (block.kind === "subtitle") {
+          return (
+            <p key={index} style={{ fontStyle: "italic", color: CV_MUTED }}>
+              <span {...changedProps(block)}>{block.text}</span>
+            </p>
+          );
+        }
         return (
           <p key={index} style={{ marginTop: top ?? pt(s.space.item) }}>
             <span {...changedProps(block)}>{block.text}</span>
@@ -216,7 +223,7 @@ function CvEntry({ s, line, first }: { s: ResolvedCvStyle; line: CvLine; first: 
       <p className="min-w-0">
         <span {...changedProps(line)}>
           <span style={{ fontWeight: 600 }}>{parts ? parts.title : line.text}</span>
-          {parts?.org ? <span>, {parts.org}</span> : null}
+          {parts?.org ? <span>{orgPrefix(parts)}{parts.org}</span> : null}
         </span>
       </p>
       {parts?.dates ? (
