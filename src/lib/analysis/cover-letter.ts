@@ -66,6 +66,23 @@ export function currentLetterText(letter: CoverLetter, candidateName?: string): 
   return letter.editedText ?? coverLetterText(letter, candidateName);
 }
 
+/**
+ * The business-letter frame around the text: who it is addressed to and the
+ * line that says what it is about. Kept out of the editable text so a copy
+ * pasted into an email starts at the greeting.
+ */
+export function letterFrame(
+  letter: Pick<CoverLetter, "options">,
+  job: { jobTitle?: string; company?: string },
+): { recipient: string[]; subject?: string } {
+  const recipient = [
+    letter.options.hiringManager?.trim() || "Hiring Manager",
+    job.company?.trim(),
+  ].filter((line): line is string => Boolean(line));
+  const role = job.jobTitle?.trim();
+  return { recipient, subject: role ? `Application for the ${role} role` : undefined };
+}
+
 /** Paragraphs of a plain-text letter, for the exporters. */
 export function letterParagraphs(text: string): string[] {
   return text

@@ -14,11 +14,14 @@
 export type CvTemplateId = "classic" | "modern" | "compact" | "elegant";
 export type CvAccentId = "espresso" | "navy" | "teal" | "forest" | "plum" | "slate";
 export type CvDensity = "normal" | "compact";
+export type CvHeaderAlign = "center" | "left";
 
 export type CvStyle = {
   template: CvTemplateId;
   accent: CvAccentId;
   density: CvDensity;
+  /** Where the name, headline and contact block sit. Centred by default. */
+  header: CvHeaderAlign;
 };
 
 export type FontFamily = "serif" | "sans";
@@ -39,7 +42,8 @@ export type CvTemplate = {
   /** Name weight; the serif name in Elegant is deliberately light. */
   nameBold: boolean;
   nameInAccent: boolean;
-  header: "left" | "center";
+  /** The template's own header alignment; the user's choice overrides it. */
+  header: CvHeaderAlign;
   heading: HeadingStyle;
   /**
    * Letter spacing on headings, as a fraction of the heading size. Kept at
@@ -129,11 +133,18 @@ export const CV_ACCENTS: Record<CvAccentId, { label: string; hex: string }> = {
 
 export const CV_ACCENT_ORDER: CvAccentId[] = ["espresso", "navy", "teal", "forest", "plum", "slate"];
 
-export const DEFAULT_CV_STYLE: CvStyle = { template: "modern", accent: "navy", density: "normal" };
+export const DEFAULT_CV_STYLE: CvStyle = {
+  template: "modern",
+  accent: "navy",
+  density: "normal",
+  header: "center",
+};
 
 /** Near-black body text and the grey for dates and contact details. */
 export const CV_INK = "#1a1a1a";
 export const CV_MUTED = "#555555";
+/** The hairline that closes the header off from the first section. */
+export const CV_HAIRLINE = "#cfcfcf";
 
 /** A4 in points. */
 export const CV_PAGE = { width: 595.28, height: 841.89 } as const;
@@ -144,7 +155,8 @@ export type ResolvedCvStyle = CvTemplate & { accent: string };
 export function resolveCvStyle(style: CvStyle): ResolvedCvStyle {
   const template = CV_TEMPLATES[style.template] ?? CV_TEMPLATES[DEFAULT_CV_STYLE.template];
   const accent = (CV_ACCENTS[style.accent] ?? CV_ACCENTS[DEFAULT_CV_STYLE.accent]).hex;
-  if (style.density !== "compact") return { ...template, accent };
+  const header = style.header === "left" ? "left" : "center";
+  if (style.density !== "compact") return { ...template, accent, header };
 
   // Tighter rather than smaller: spacing gives way first, type only a little,
   // so a compact CV is still comfortable to read on paper.
@@ -152,6 +164,7 @@ export function resolveCvStyle(style: CvStyle): ResolvedCvStyle {
   return {
     ...template,
     accent,
+    header,
     size: {
       ...template.size,
       body: template.size.body - 0.5,
@@ -175,6 +188,7 @@ export function parseCvStyle(value: unknown): CvStyle {
     template: raw.template && raw.template in CV_TEMPLATES ? raw.template : DEFAULT_CV_STYLE.template,
     accent: raw.accent && raw.accent in CV_ACCENTS ? raw.accent : DEFAULT_CV_STYLE.accent,
     density: raw.density === "compact" ? "compact" : "normal",
+    header: raw.header === "left" ? "left" : "center",
   };
 }
 

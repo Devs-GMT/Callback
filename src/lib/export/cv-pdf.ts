@@ -14,6 +14,7 @@
 
 import type { CvLayout, CvLine } from "@/lib/analysis/cv-layout";
 import {
+  CV_HAIRLINE,
   CV_INK,
   CV_MUTED,
   CV_PAGE,
@@ -170,11 +171,11 @@ export class CvPdfWriter {
     }
 
     if (headline) {
-      const size = s.size.body + 1;
-      this.font(s.font.body, "normal", size, CV_INK);
+      const size = s.size.body + 1.5;
+      this.font(s.font.body, "bold", size, s.accent);
       const wrapped = this.wrap(headline, this.width);
       this.draw(wrapped, x, this.reserve(wrapped.length * this.lineHeight(size)), align);
-      this.gap(2);
+      this.gap(3);
     }
 
     for (const line of lines) {
@@ -182,7 +183,13 @@ export class CvPdfWriter {
       const wrapped = this.wrap(line, this.width);
       this.draw(wrapped, x, this.reserve(wrapped.length * this.lineHeight(s.size.small)), align);
     }
-    this.gap(s.space.section * 0.5);
+
+    // A hairline closes the header off from the first section.
+    this.gap(s.space.section * 0.55);
+    this.doc.setDrawColor(...hexToRgb(CV_HAIRLINE));
+    this.doc.setLineWidth(0.6);
+    this.doc.line(this.x, this.y, this.x + this.width, this.y);
+    this.gap(s.space.section * 0.15);
   }
 
   heading(text: string): void {
@@ -284,10 +291,10 @@ export class CvPdfWriter {
     this.draw(wrapped, this.x + indent, top);
   }
 
-  paragraph(text: string, options: { gap?: number } = {}): void {
+  paragraph(text: string, options: { gap?: number; bold?: boolean } = {}): void {
     const s = this.s;
     this.beforeBlock(options.gap ?? s.space.item);
-    this.font(s.font.body, "normal", s.size.body, CV_INK);
+    this.font(s.font.body, options.bold ? "bold" : "normal", s.size.body, CV_INK);
     const wrapped = this.wrap(text, this.width);
     this.draw(wrapped, this.x, this.reserve(wrapped.length * this.lineHeight(s.size.body)));
   }

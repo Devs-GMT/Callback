@@ -25,7 +25,18 @@ import type { CoverLetterRequest, CoverLetterResponse } from "@/lib/types";
 export const maxDuration = 60;
 
 const TONES = ["professional", "warm", "confident"] as const;
-const LENGTHS = ["short", "standard"] as const;
+const LENGTHS = ["short", "standard", "detailed"] as const;
+
+/**
+ * Below this many words the letter reads thin. The fast model sometimes
+ * undershoots, so one more attempt is made, time allowing, and the longer of
+ * the two verified drafts is kept.
+ */
+const MIN_WORDS: Record<(typeof LENGTHS)[number], number> = { short: 230, standard: 310, detailed: 400 };
+const RETRY_BEFORE_MS = 25_000;
+
+const draftWords = (draft: CoverLetterResponse) =>
+  [draft.opening, ...draft.body.map((p) => p.text), draft.closing].join(" ").split(/\s+/).filter(Boolean).length;
 
 function cleanString(value: unknown, max: number): string | undefined {
   if (typeof value !== "string") return undefined;
@@ -104,7 +115,8 @@ export async function POST(request: Request): Promise<Response> {
     gaps: stringList(body.data.gaps, 10, 300),
   };
 
-  try {
+  const started = Date.now();
+  const attempt = async () => {
     const raw = await generateJson<unknown>({
       model: MODELS.pivot,
       thinking: THINKING.pivot,
@@ -113,8 +125,15 @@ export async function POST(request: Request): Promise<Response> {
       schema: COVER_LETTER_JSON_SCHEMA,
       temperature: 0.6,
     });
+    return verifyCoverLetter(parseCoverLetterResponse(raw), cvText).draft;
+  };
 
-    const { draft } = verifyCoverLetter(parseCoverLetterResponse(raw), cvText);
+  try {
+    let draft = await attempt();
+    if (draftWords(draft) < MIN_WORDS[payload.length] && Date.now() - started < RETRY_BEFORE_MS) {
+      const second = await attempt().catch(() => null);
+      if (second && second.body.length > 0 && draftWords(second) > draftWords(draft)) draft = second;
+    }
 
     if (draft.opening.length === 0 || draft.body.length === 0) {
       return jsonError(

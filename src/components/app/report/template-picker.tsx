@@ -95,27 +95,61 @@ export function TemplatePicker({
           </div>
         </fieldset>
 
-        <fieldset>
-          <legend className="mb-2 text-[12px] font-medium text-ink">Spacing</legend>
-          <div className="inline-flex rounded-[6px] bg-sand p-1 ring-1 ring-line">
-            {(["normal", "compact"] as const).map((density) => (
-              <button
-                key={density}
-                type="button"
-                aria-pressed={value.density === density}
-                onClick={() => onChange({ ...value, density })}
-                className={cn(
-                  "min-h-9 rounded-[4px] px-3.5 text-[12.5px] capitalize transition-colors",
-                  "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-espresso-btn",
-                  value.density === density ? "bg-white font-medium text-ink shadow-sm" : "text-muted hover:text-ink",
-                )}
-              >
-                {density}
-              </button>
-            ))}
-          </div>
-        </fieldset>
+        <Toggle
+          legend="Header"
+          items={[
+            { id: "center", label: "Centred" },
+            { id: "left", label: "Left" },
+          ]}
+          value={value.header}
+          onChange={(header) => onChange({ ...value, header })}
+        />
+
+        <Toggle
+          legend="Spacing"
+          items={[
+            { id: "normal", label: "Normal" },
+            { id: "compact", label: "Compact" },
+          ]}
+          value={value.density}
+          onChange={(density) => onChange({ ...value, density })}
+        />
       </div>
     </div>
+  );
+}
+
+function Toggle<T extends string>({
+  legend,
+  items,
+  value,
+  onChange,
+}: {
+  legend: string;
+  items: Array<{ id: T; label: string }>;
+  value: T;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <fieldset>
+      <legend className="mb-2 text-[12px] font-medium text-ink">{legend}</legend>
+      <div className="inline-flex rounded-[6px] bg-sand p-1 ring-1 ring-line">
+        {items.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            aria-pressed={value === item.id}
+            onClick={() => onChange(item.id)}
+            className={cn(
+              "min-h-9 rounded-[4px] px-3.5 text-[12.5px] transition-colors",
+              "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-espresso-btn",
+              value === item.id ? "bg-white font-medium text-ink shadow-sm" : "text-muted hover:text-ink",
+            )}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+    </fieldset>
   );
 }

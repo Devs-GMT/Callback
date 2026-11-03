@@ -245,7 +245,7 @@ export type Report = {
 /* -------------------------------------------------------------------------- */
 
 export type CoverLetterTone = "professional" | "warm" | "confident";
-export type CoverLetterLength = "short" | "standard";
+export type CoverLetterLength = "short" | "standard" | "detailed";
 
 /** A body paragraph and the CV quotes that back every claim in it. */
 export type CoverLetterParagraph = {

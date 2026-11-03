@@ -16,6 +16,7 @@
 
 import type { CvLayout, CvLine } from "@/lib/analysis/cv-layout";
 import {
+  CV_HAIRLINE,
   CV_INK,
   CV_MUTED,
   CV_PAGE,
@@ -61,41 +62,54 @@ export function docxBlocks(docx: Docx, s: ResolvedCvStyle) {
     contentWidth,
 
     header(name: string | undefined, headline: string | undefined, lines: string[]): Paragraph[] {
-      const out: Paragraph[] = [];
+      type Block = { runs: InstanceType<Docx["TextRun"]>[]; after: number; title?: boolean };
+      const blocks: Block[] = [];
       if (name) {
-        out.push(
-          new Paragraph({
-            heading: HeadingLevel.TITLE,
-            alignment: align,
-            spacing: { after: twip(s.size.name * 0.25), line: 240 },
-            children: [
-              run(name, s.font.name, s.size.name, {
-                bold: s.nameBold,
-                color: hex(s.nameInAccent ? s.accent : CV_INK),
-              }),
-            ],
-          }),
-        );
+        blocks.push({
+          title: true,
+          after: twip(s.size.name * 0.25),
+          runs: [
+            run(name, s.font.name, s.size.name, {
+              bold: s.nameBold,
+              color: hex(s.nameInAccent ? s.accent : CV_INK),
+            }),
+          ],
+        });
       }
       if (headline) {
-        out.push(
-          new Paragraph({
-            alignment: align,
-            spacing: { after: twip(2), line },
-            children: [run(headline, s.font.body, s.size.body + 1)],
-          }),
-        );
+        blocks.push({
+          after: twip(3),
+          runs: [run(headline, s.font.body, s.size.body + 1.5, { bold: true, color: hex(s.accent) })],
+        });
       }
-      lines.forEach((text, index) => {
-        out.push(
-          new Paragraph({
-            alignment: align,
-            spacing: { after: index === lines.length - 1 ? twip(s.space.section * 0.5) : 0, line },
-            children: [run(text, s.font.body, s.size.small, { color: hex(CV_MUTED) })],
-          }),
-        );
+      for (const text of lines) {
+        blocks.push({ after: 0, runs: [run(text, s.font.body, s.size.small, { color: hex(CV_MUTED) })] });
+      }
+
+      // A hairline under the last header line closes it off from the first
+      // section, as in the preview and the PDF.
+      return blocks.map((block, index) => {
+        const last = index === blocks.length - 1;
+        return new Paragraph({
+          heading: block.title ? HeadingLevel.TITLE : undefined,
+          alignment: align,
+          spacing: {
+            after: last ? twip(s.space.section * 0.15) : block.after,
+            line: block.title ? 240 : line,
+          },
+          border: last
+            ? {
+                bottom: {
+                  style: BorderStyle.SINGLE,
+                  size: 4,
+                  color: hex(CV_HAIRLINE),
+                  space: Math.round(s.space.section * 0.55),
+                },
+              }
+            : undefined,
+          children: block.runs,
+        });
       });
-      return out;
     },
 
     heading(text: string): Paragraph {
@@ -154,10 +168,10 @@ export function docxBlocks(docx: Docx, s: ResolvedCvStyle) {
       });
     },
 
-    paragraph(text: string, after = s.space.item): Paragraph {
+    paragraph(text: string, after = s.space.item, bold = false): Paragraph {
       return new Paragraph({
         spacing: { after: twip(after), line },
-        children: [run(text, s.font.body, s.size.body)],
+        children: [run(text, s.font.body, s.size.body, { bold })],
       });
     },
 

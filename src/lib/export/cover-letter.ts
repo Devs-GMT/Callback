@@ -20,6 +20,10 @@ export type LetterExport = {
   style: CvStyle;
   /** Printed under the header, e.g. "4 November 2026". */
   date: string;
+  /** Addressee lines, e.g. the hiring manager and the company. */
+  recipient: string[];
+  /** "Application for the … role", set in bold above the greeting. */
+  subject?: string;
   jobTitle?: string;
 };
 
@@ -42,6 +46,12 @@ export async function buildCoverLetterPdf(input: LetterExport): Promise<Blob> {
   writer.gap(s.space.section);
   writer.small(input.date);
   writer.gap(s.space.section * 0.6);
+  input.recipient.forEach((line) => writer.paragraph(line, { gap: 0 }));
+  if (input.subject) {
+    writer.gap(s.space.section * 0.6);
+    writer.paragraph(input.subject, { gap: 0, bold: true });
+  }
+  writer.gap(s.space.section * 0.6);
 
   for (const paragraph of letterParagraphs(input.text)) {
     writer.paragraph(paragraph, { gap: s.size.body * 0.9 });
@@ -60,6 +70,11 @@ export async function buildCoverLetterDocx(input: LetterExport): Promise<Blob> {
     input.layout.contact.map((line) => line.text),
   );
   children.push(blocks.small(input.date, s.space.section * 0.6));
+  input.recipient.forEach((line, index) => {
+    const last = index === input.recipient.length - 1;
+    children.push(blocks.paragraph(line, last ? s.space.section * 0.6 : 0));
+  });
+  if (input.subject) children.push(blocks.paragraph(input.subject, s.space.section * 0.6, true));
   for (const paragraph of letterParagraphs(input.text)) {
     const lines = paragraph.split("\n");
     lines.forEach((line, index) => {

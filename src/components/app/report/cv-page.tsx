@@ -3,6 +3,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import type { CvLayout, CvLine } from "@/lib/analysis/cv-layout";
 import {
+  CV_HAIRLINE,
   CV_INK,
   CV_MUTED,
   CV_PAGE,
@@ -82,7 +83,14 @@ export function CvHeader({
 }) {
   const align = s.header === "center" ? "center" : "left";
   return (
-    <header style={{ textAlign: align, marginBottom: pt(s.space.section * 0.5) }}>
+    <header
+      style={{
+        textAlign: align,
+        paddingBottom: pt(s.space.section * 0.55),
+        borderBottom: `${pt(0.6)} solid ${CV_HAIRLINE}`,
+        marginBottom: pt(s.space.section * 0.15),
+      }}
+    >
       {name ? (
         <h2
           style={{
@@ -99,7 +107,14 @@ export function CvHeader({
         </h2>
       ) : null}
       {headline ? (
-        <p style={{ fontSize: pt(s.size.body + 1), marginBottom: pt(2) }}>
+        <p
+          style={{
+            fontSize: pt(s.size.body + 1.5),
+            fontWeight: 600,
+            color: s.accent,
+            marginBottom: pt(3),
+          }}
+        >
           <span {...changedProps(headline)}>{headline.text}</span>
         </p>
       ) : null}

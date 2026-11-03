@@ -10,6 +10,7 @@ import { applySuggestions } from "@/lib/analysis/apply";
 import { layoutCv, layoutText, layoutToText } from "@/lib/analysis/cv-layout";
 import {
   currentLetterText,
+  letterFrame,
   letterParagraphs,
   letterWordCount,
 } from "@/lib/analysis/cover-letter";
@@ -47,6 +48,7 @@ const TONES: Array<{ id: CoverLetterTone; label: string }> = [
 const LENGTHS: Array<{ id: CoverLetterLength; label: string }> = [
   { id: "short", label: "Short" },
   { id: "standard", label: "Standard" },
+  { id: "detailed", label: "Detailed" },
 ];
 
 const letterDate = (time: number) =>
@@ -88,6 +90,7 @@ export function CoverLetterTab({
   useEffect(() => () => abort.current?.abort(), []);
 
   const text = letter ? currentLetterText(letter, candidateName) : "";
+  const frame = letter ? letterFrame(letter, report) : { recipient: [] };
   const words = letterWordCount(editing ? draft : text);
 
   const write = async () => {
@@ -145,7 +148,14 @@ export function CoverLetterTab({
     setExporting(format);
     try {
       const { buildCoverLetterDocx, buildCoverLetterPdf } = await import("@/lib/export/cover-letter");
-      const input = { layout, text, style, date: letterDate(letter.createdAt), jobTitle: report.jobTitle };
+      const input = {
+        layout,
+        text,
+        style,
+        date: letterDate(letter.createdAt),
+        jobTitle: report.jobTitle,
+        ...letterFrame(letter, report),
+      };
       const blob = format === "pdf" ? await buildCoverLetterPdf(input) : await buildCoverLetterDocx(input);
       downloadBlob(blob, cvFilename(report.jobTitle, format, "cover-letter"));
     } catch {
@@ -219,7 +229,7 @@ export function CoverLetterTab({
             </Button>
             {busy ? (
               <span className="text-[12px] text-muted" aria-live="polite">
-                Usually 10 to 20 seconds.
+                Usually 15 to 30 seconds.
               </span>
             ) : letter?.editedText && !busy ? (
               <span className="text-[12px] text-muted">A new version replaces your edits.</span>
@@ -297,6 +307,14 @@ export function CoverLetterTab({
                       <p style={{ marginTop: pt(s.space.section), fontSize: pt(s.size.small), color: "#555555" }}>
                         {letterDate(letter.createdAt)}
                       </p>
+                      <div style={{ marginTop: pt(s.space.section * 0.6) }}>
+                        {frame.recipient.map((line, index) => (
+                          <p key={index}>{line}</p>
+                        ))}
+                      </div>
+                      {frame.subject ? (
+                        <p style={{ marginTop: pt(s.space.section * 0.6), fontWeight: 600 }}>{frame.subject}</p>
+                      ) : null}
                       <div style={{ marginTop: pt(s.space.section * 0.6) }}>
                         {letterParagraphs(text).map((paragraph, index) => (
                           <p key={index} className="whitespace-pre-line" style={{ marginTop: index === 0 ? 0 : pt(s.size.body * 0.9) }}>
