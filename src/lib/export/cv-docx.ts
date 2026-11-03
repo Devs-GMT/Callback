@@ -15,6 +15,7 @@
  */
 
 import { orgPrefix, type CvLayout, type CvLine } from "@/lib/analysis/cv-layout";
+import { contactRuns, parseInline, stripInline, type InlineRun } from "@/lib/analysis/inline";
 import {
   CV_HAIRLINE,
   headerRule,
@@ -52,7 +53,7 @@ const hex = (colour: string) => colour.replace("#", "");
 
 /** Paragraph builders shared by the CV and the cover letter. */
 export function docxBlocks(docx: Docx, s: ResolvedCvStyle) {
-  const { Paragraph, TextRun, AlignmentType, BorderStyle, TabStopType, HeadingLevel } = docx;
+  const { Paragraph, TextRun, ExternalHyperlink, AlignmentType, BorderStyle, TabStopType, HeadingLevel } = docx;
   const contentWidth = twip(CV_PAGE.width - s.margin.x * 2);
   const size = (family: FontFamily, pt: number) => half(pt * WORD_SCALE[family]);
   const line = Math.round(240 * s.space.line * 0.92);
@@ -61,18 +62,33 @@ export function docxBlocks(docx: Docx, s: ResolvedCvStyle) {
   const run = (text: string, family: FontFamily, pt: number, extra: Record<string, unknown> = {}) =>
     new TextRun({ text, font: WORD_FONT[family], size: size(family, pt), color: hex(CV_INK), ...extra });
 
+  /** Formatted text as Word runs: bold, italics and real hyperlinks. */
+  const rich = (text: string | InlineRun[], family: FontFamily, pt: number, extra: Record<string, unknown> = {}) =>
+    (typeof text === "string" ? parseInline(text) : text).map((piece) => {
+      const textRun = run(piece.text, family, pt, {
+        ...extra,
+        ...(piece.bold ? { bold: true } : {}),
+        ...(piece.italic ? { italics: true } : {}),
+      });
+      return piece.href ? new ExternalHyperlink({ link: piece.href, children: [textRun] }) : textRun;
+    });
+
   return {
     contentWidth,
 
     header(name: string | undefined, headline: string | undefined, lines: HeaderLine[]): Paragraph[] {
-      type Block = { runs: InstanceType<Docx["TextRun"]>[]; after: number; title?: boolean };
+      type Block = {
+        runs: Array<InstanceType<Docx["TextRun"]> | InstanceType<Docx["ExternalHyperlink"]>>;
+        after: number;
+        title?: boolean;
+      };
       const blocks: Block[] = [];
       if (name) {
         blocks.push({
           title: true,
           after: twip(s.size.name * 0.25),
           runs: [
-            run(s.caps ? name.toUpperCase() : name, s.font.name, s.size.name, {
+            run(s.caps ? stripInline(name).toUpperCase() : stripInline(name), s.font.name, s.size.name, {
               bold: s.nameBold,
               color: hex(s.nameInAccent ? s.accent : CV_INK),
             }),
@@ -83,17 +99,19 @@ export function docxBlocks(docx: Docx, s: ResolvedCvStyle) {
         blocks.push({
           after: twip(3),
           runs: [
-            run(s.caps ? headline.toUpperCase() : headline, s.font.body, s.size.body + 1.5, {
-              bold: true,
-              color: hex(headlineColour(s)),
-            }),
+            ...rich(
+              parseInline(headline).map((piece) => (s.caps ? { ...piece, text: piece.text.toUpperCase() } : piece)),
+              s.font.body,
+              s.size.body + 1.5,
+              { bold: true, color: hex(headlineColour(s)) },
+            ),
           ],
         });
       }
       for (const line of lines) {
         blocks.push({
           after: 0,
-          runs: [run(line.text, s.font.body, s.size.small, { color: hex(line.links ? s.accent : CV_MUTED) })],
+          runs: rich(contactRuns(line.text), s.font.body, s.size.small, { color: hex(line.links ? s.accent : CV_MUTED) }),
         });
       }
 
@@ -155,13 +173,13 @@ export function docxBlocks(docx: Docx, s: ResolvedCvStyle) {
       const parts = item.parts;
       const children = parts
         ? [
-            run(parts.title, s.font.body, s.size.body, { bold: true }),
-            ...(parts.org ? [run(`${orgPrefix(parts)}${parts.org}`, s.font.body, s.size.body)] : []),
+            run(stripInline(parts.title), s.font.body, s.size.body, { bold: true }),
+            ...(parts.org ? [run(`${orgPrefix(parts)}${stripInline(parts.org)}`, s.font.body, s.size.body)] : []),
             ...(parts.dates
               ? [run(`\t${parts.dates}`, s.font.body, s.size.small, { color: hex(CV_MUTED) })]
               : []),
           ]
-        : [run(item.text, s.font.body, s.size.body, { bold: true })];
+        : [run(stripInline(item.text), s.font.body, s.size.body, { bold: true })];
       return new Paragraph({
         keepNext: true,
         tabStops: [{ type: TabStopType.RIGHT, position: contentWidth }],
@@ -176,14 +194,14 @@ export function docxBlocks(docx: Docx, s: ResolvedCvStyle) {
         // what a parser expects to find.
         bullet: { level: 0 },
         spacing: { after: twip(s.space.item), line },
-        children: [run(text, s.font.body, s.size.body)],
+        children: rich(text, s.font.body, s.size.body),
       });
     },
 
     paragraph(text: string, after = s.space.item, bold = false): Paragraph {
       return new Paragraph({
         spacing: { after: twip(after), line },
-        children: [run(text, s.font.body, s.size.body, { bold })],
+        children: rich(text, s.font.body, s.size.body, bold ? { bold } : {}),
       });
     },
 
@@ -191,14 +209,14 @@ export function docxBlocks(docx: Docx, s: ResolvedCvStyle) {
       return new Paragraph({
         keepNext: true,
         spacing: { after: twip(s.space.item), line },
-        children: [run(text, s.font.body, s.size.body, { italics: true, color: hex(CV_MUTED) })],
+        children: rich(text, s.font.body, s.size.body, { italics: true, color: hex(CV_MUTED) }),
       });
     },
 
     small(text: string, after = s.space.item): Paragraph {
       return new Paragraph({
         spacing: { after: twip(after), line },
-        children: [run(text, s.font.body, s.size.small, { color: hex(CV_MUTED) })],
+        children: rich(text, s.font.body, s.size.small, { color: hex(CV_MUTED) }),
       });
     },
 
@@ -280,7 +298,7 @@ export async function buildCvDocx(
     });
   }
 
-  const title = layout.name ? `${layout.name.text} — CV` : (options.title ?? "CV");
+  const title = layout.name ? `${stripInline(layout.name.text)} — CV` : (options.title ?? "CV");
   const document = docxDocument(docx, s, title, "Improved CV exported from Callback", children);
   return docx.Packer.toBlob(document);
 }

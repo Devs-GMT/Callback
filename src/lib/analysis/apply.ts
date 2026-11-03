@@ -19,6 +19,7 @@
  */
 
 import { isHeading } from "@/lib/analysis/cv-layout";
+import { stripInline } from "@/lib/analysis/inline";
 import type { Suggestion, SuggestionDecision } from "@/lib/types";
 
 export type CvSegment = {
@@ -48,7 +49,8 @@ export function isApplicable(suggestion: Suggestion): boolean {
 
 /** Compare two lines ignoring case, whitespace and bullet markers. */
 function normaliseForMatch(line: string): string {
-  return line
+  // Formatting is invisible to the model, so its quotes never carry markers.
+  return stripInline(line)
     .replace(/^\s*(?:[-–—•·*▪◦‣]|\d{1,2}[.)])\s+/, "")
     .replace(/\s+/g, " ")
     .trim()

@@ -13,6 +13,7 @@
  */
 
 import type { CvSegment } from "@/lib/analysis/apply";
+import { stripInline } from "@/lib/analysis/inline";
 
 export type CvLineKind =
   /** A plain paragraph line. */
@@ -167,7 +168,8 @@ export function splitEntry(text: string): CvEntryParts | undefined {
 
 /** Does this line read as a section heading? */
 export function isHeading(line: string): boolean {
-  const trimmed = line.trim();
+  // "**SKILLS**" is still the Skills heading.
+  const trimmed = stripInline(line).trim();
   if (trimmed.length === 0 || trimmed.length > 48) return false;
   if (BULLET_MARKER.test(line)) return false;
   if (KNOWN_HEADING.test(trimmed)) return true;
@@ -191,7 +193,7 @@ export function isHeading(line: string): boolean {
 }
 
 function headingText(raw: string): string {
-  return raw.trim().replace(/\s*:$/, "").replace(/\s+/g, " ").toUpperCase();
+  return stripInline(raw).trim().replace(/\s*:$/, "").replace(/\s+/g, " ").toUpperCase();
 }
 
 type Part = { heading: string; source: string; base: Pick<CvLine, "changed" | "replaced"> } | { line: CvLine };
@@ -330,9 +332,9 @@ export function layoutCv(segments: CvSegment[]): CvLayout {
   const looksLikeName =
     nameLine !== undefined &&
     nameLine.kind === "text" &&
-    nameLine.text.length <= 60 &&
+    stripInline(nameLine.text).length <= 60 &&
     !CONTACT_HINT.test(nameLine.text) &&
-    !/[.!?]$/.test(nameLine.text);
+    !/[.!?]$/.test(stripInline(nameLine.text));
 
   const headerLines = looksLikeName ? rest : opening;
   const others = headerLines.filter((line) => !CONTACT_HINT.test(line.text));
@@ -429,4 +431,44 @@ export function layoutToText(layout: CvLayout): string {
 /** Lay out a plain string, for text the user has edited by hand. */
 export function layoutText(text: string): CvLayout {
   return layoutCv(text.split("\n").map((line) => ({ text: line, changed: false })));
+}
+
+/* -------------------------------------------------------------------------- */
+/* Section edits                                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Move a section to a new place. Works on the text, so the change is part of
+ * the CV the user copies, downloads and re-checks.
+ */
+export function moveSection(text: string, from: number, to: number): string {
+  const layout = layoutText(text);
+  const sections = [...layout.sections];
+  if (from < 0 || from >= sections.length || to < 0 || to >= sections.length) return text;
+  const [moved] = sections.splice(from, 1);
+  sections.splice(to, 0, moved);
+  return layoutToText({ ...layout, sections });
+}
+
+/**
+ * A heading as typed, cleaned so it still reads as a heading on the next
+ * layout: capitals, no colon, at least three letters. Undefined when unusable.
+ */
+export function cleanHeading(value: string): string | undefined {
+  const heading = stripInline(value).replace(/[:\n]/g, " ").replace(/\s+/g, " ").trim().toUpperCase();
+  return heading.replace(/[^\p{L}]/gu, "").length >= 3 && heading.length <= 48 ? heading : undefined;
+}
+
+export function renameSection(text: string, index: number, heading: string): string {
+  const clean = cleanHeading(heading);
+  const layout = layoutText(text);
+  if (!clean || !layout.sections[index]) return text;
+  const sections = layout.sections.map((section, i) => (i === index ? { ...section, heading: clean } : section));
+  return layoutToText({ ...layout, sections });
+}
+
+/** The layout with the sections the user has hidden left out. */
+export function withoutSections(layout: CvLayout, hidden: readonly string[]): CvLayout {
+  if (hidden.length === 0) return layout;
+  return { ...layout, sections: layout.sections.filter((section) => !hidden.includes(section.heading)) };
 }

@@ -13,6 +13,7 @@
  */
 
 import { orgPrefix, type CvLayout, type CvLine } from "@/lib/analysis/cv-layout";
+import { contactRuns, parseInline, stripInline, type InlineRun } from "@/lib/analysis/inline";
 import {
   CV_HAIRLINE,
   headerRule,
@@ -30,6 +31,9 @@ import {
 
 type Doc = import("jspdf").jsPDF;
 type Weight = "normal" | "bold" | "italic";
+
+/** A run of same-style text on one laid-out line. */
+type Piece = { text: string; weight: Weight; href?: string; width: number };
 
 const FONT_FILES: Record<FontFamily, Record<Weight, string>> = {
   sans: { normal: "Inter-Regular.ttf", bold: "Inter-SemiBold.ttf", italic: "Inter-Italic.ttf" },
@@ -152,6 +156,89 @@ export class CvPdfWriter {
     this.doc.text(lines, x, top, { baseline: "top", align });
   }
 
+  /**
+   * Break formatted runs into lines no wider than `width`. Each line is a
+   * list of same-style pieces, so a plain line is still drawn in one call and
+   * extracts exactly as before.
+   */
+  private flowLines(runs: InlineRun[], width: number, size: number, family: FontFamily, base: Weight): Piece[][] {
+    const lines: Piece[][] = [[]];
+    let used = 0;
+    for (const run of runs) {
+      const weight: Weight = run.bold ? "bold" : run.italic ? "italic" : base;
+      this.font(family, weight, size, CV_INK);
+      for (const token of run.text.split(/(\s+)/)) {
+        if (token.length === 0) continue;
+        const line = lines[lines.length - 1];
+        const space = /^\s+$/.test(token);
+        if (space && line.length === 0) continue;
+        // Runs of spaces are kept: the contact line spaces its "•" widely.
+        const tokenWidth = this.doc.getTextWidth(token);
+        if (!space && used + tokenWidth > width && line.some((piece) => piece.text.trim().length > 0)) {
+          lines.push([]);
+          used = 0;
+        }
+        const current = lines[lines.length - 1];
+        const previous = current[current.length - 1];
+        const text = token;
+        if (previous && previous.weight === weight && previous.href === run.href) {
+          previous.text += text;
+          previous.width += tokenWidth;
+        } else {
+          current.push({ text, weight, href: run.href, width: tokenWidth });
+        }
+        used += tokenWidth;
+      }
+    }
+    // Trailing spaces would push a centred line off-centre.
+    for (const line of lines) {
+      const last = line[line.length - 1];
+      if (last && /\s$/.test(last.text)) {
+        last.text = last.text.replace(/\s+$/, "");
+        this.font(family, last.weight, size, CV_INK);
+        last.width = this.doc.getTextWidth(last.text);
+      }
+    }
+    return lines.filter((line) => line.length > 0);
+  }
+
+  private drawLines(
+    lines: Piece[][],
+    x: number,
+    top: number,
+    size: number,
+    family: FontFamily,
+    colour: string,
+    align: "left" | "center" = "left",
+  ): void {
+    lines.forEach((line, index) => {
+      const y = top + index * this.lineHeight(size);
+      const total = line.reduce((sum, piece) => sum + piece.width, 0);
+      let cursor = align === "center" ? x - total / 2 : x;
+      for (const piece of line) {
+        this.font(family, piece.weight, size, colour);
+        this.doc.text(piece.text, cursor, y, { baseline: "top" });
+        if (piece.href) {
+          this.doc.link(cursor, y, piece.width, size * 1.15, { url: piece.href });
+        }
+        cursor += piece.width;
+      }
+    });
+  }
+
+  /** Lay out and draw formatted text as one block, returning nothing. */
+  private flow(
+    text: string | InlineRun[],
+    options: { x?: number; width?: number; size: number; weight?: Weight; colour: string; align?: "left" | "center"; family?: FontFamily; keep?: number },
+  ): void {
+    const s = this.s;
+    const family = options.family ?? s.font.body;
+    const runs = typeof text === "string" ? parseInline(text) : text;
+    const lines = this.flowLines(runs, options.width ?? this.width, options.size, family, options.weight ?? "normal");
+    const top = this.reserve(lines.length * this.lineHeight(options.size), options.keep);
+    this.drawLines(lines, options.x ?? this.x, top, options.size, family, options.colour, options.align);
+  }
+
   gap(points: number): void {
     this.y += points;
   }
@@ -165,7 +252,8 @@ export class CvPdfWriter {
 
     if (name) {
       this.font(s.font.name, s.nameBold ? "bold" : "normal", s.size.name, s.nameInAccent ? s.accent : CV_INK);
-      const wrapped = this.wrap(s.caps ? name.toUpperCase() : name, this.width);
+      const plain = stripInline(name);
+      const wrapped = this.wrap(s.caps ? plain.toUpperCase() : plain, this.width);
       const height = wrapped.length * s.size.name * 1.12;
       this.doc.setLineHeightFactor(1.12);
       this.draw(wrapped, x, this.reserve(height), align);
@@ -175,16 +263,13 @@ export class CvPdfWriter {
 
     if (headline) {
       const size = s.size.body + 1.5;
-      this.font(s.font.body, "bold", size, headlineColour(s));
-      const wrapped = this.wrap(s.caps ? headline.toUpperCase() : headline, this.width);
-      this.draw(wrapped, x, this.reserve(wrapped.length * this.lineHeight(size)), align);
+      const runs = parseInline(headline).map((run) => (s.caps ? { ...run, text: run.text.toUpperCase() } : run));
+      this.flow(runs, { x, size, weight: "bold", colour: headlineColour(s), align });
       this.gap(3);
     }
 
     for (const line of lines) {
-      this.font(s.font.body, "normal", s.size.small, line.links ? s.accent : CV_MUTED);
-      const wrapped = this.wrap(line.text, this.width);
-      this.draw(wrapped, x, this.reserve(wrapped.length * this.lineHeight(s.size.small)), align);
+      this.flow(contactRuns(line.text), { x, size: s.size.small, colour: line.links ? s.accent : CV_MUTED, align });
     }
 
     // A hairline closes the header off from the first section, unless the
@@ -234,11 +319,17 @@ export class CvPdfWriter {
     this.beforeBlock(s.space.entry);
     const size = s.size.body;
     const lh = this.lineHeight(size);
-    const parts = line.parts;
+    const parts = line.parts
+      ? {
+          ...line.parts,
+          title: stripInline(line.parts.title),
+          org: line.parts.org ? stripInline(line.parts.org) : undefined,
+        }
+      : undefined;
 
     if (!parts) {
       this.font(s.font.body, "bold", size, CV_INK);
-      const wrapped = this.wrap(line.text, this.width);
+      const wrapped = this.wrap(stripInline(line.text), this.width);
       this.draw(wrapped, this.x, this.reserve(wrapped.length * lh, lh));
       return;
     }
@@ -292,37 +383,31 @@ export class CvPdfWriter {
     const s = this.s;
     this.beforeBlock(s.space.item);
     const indent = s.size.body * 1.15;
+    const lines = this.flowLines(parseInline(text), this.width - indent, s.size.body, s.font.body, "normal");
+    const top = this.reserve(lines.length * this.lineHeight(s.size.body));
     this.font(s.font.body, "normal", s.size.body, CV_INK);
-    const wrapped = this.wrap(text, this.width - indent);
-    const top = this.reserve(wrapped.length * this.lineHeight(s.size.body));
     this.draw("•", this.x + 1.5, top);
-    this.draw(wrapped, this.x + indent, top);
+    this.drawLines(lines, this.x + indent, top, s.size.body, s.font.body, CV_INK);
   }
 
   paragraph(text: string, options: { gap?: number; bold?: boolean } = {}): void {
     const s = this.s;
     this.beforeBlock(options.gap ?? s.space.item);
-    this.font(s.font.body, options.bold ? "bold" : "normal", s.size.body, CV_INK);
-    const wrapped = this.wrap(text, this.width);
-    this.draw(wrapped, this.x, this.reserve(wrapped.length * this.lineHeight(s.size.body)));
+    this.flow(text, { size: s.size.body, weight: options.bold ? "bold" : "normal", colour: CV_INK });
   }
 
   /** The job title under an employer entry: italic, muted, no gap above. */
   subtitle(text: string): void {
     const s = this.s;
     this.sectionStart = false;
-    this.font(s.font.body, "italic", s.size.body, CV_MUTED);
-    const wrapped = this.wrap(text, this.width);
-    this.draw(wrapped, this.x, this.reserve(wrapped.length * this.lineHeight(s.size.body)));
+    this.flow(text, { size: s.size.body, weight: "italic", colour: CV_MUTED });
   }
 
   /** A small muted line, such as the date on a letter. */
   small(text: string, options: { gap?: number } = {}): void {
     const s = this.s;
     this.beforeBlock(options.gap ?? s.space.item);
-    this.font(s.font.body, "normal", s.size.small, CV_MUTED);
-    const wrapped = this.wrap(text, this.width);
-    this.draw(wrapped, this.x, this.reserve(wrapped.length * this.lineHeight(s.size.small)));
+    this.flow(text, { size: s.size.small, colour: CV_MUTED });
   }
 
   /** Lines of a CV section, in order. */
@@ -342,7 +427,7 @@ export async function buildCvPdf(
   style: CvStyle,
   options: { title?: string } = {},
 ): Promise<Blob> {
-  const title = layout.name ? `${layout.name.text} — CV` : (options.title ?? "CV");
+  const title = layout.name ? `${stripInline(layout.name.text)} — CV` : (options.title ?? "CV");
   const { doc, embedded } = await createCvDoc(title);
   const writer = new CvPdfWriter(doc, style, embedded);
 

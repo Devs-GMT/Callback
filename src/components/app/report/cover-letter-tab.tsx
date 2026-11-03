@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Tag } from "@/components/ui/tag";
 import { TextAreaField, TextField } from "@/components/ui/field";
 import { applySuggestions } from "@/lib/analysis/apply";
-import { layoutCv, layoutText, layoutToText } from "@/lib/analysis/cv-layout";
+import { layoutCv, layoutText, layoutToText, withoutSections } from "@/lib/analysis/cv-layout";
+import { stripInline } from "@/lib/analysis/inline";
 import {
   currentLetterText,
   letterFrame,
@@ -63,11 +64,15 @@ export function CoverLetterTab({
 }) {
   // The CV the letter is written from: the user's hand edit if there is one,
   // otherwise the CV with accepted suggestions applied.
+  // The report starts with `improvedCvText` equal to the original, which is
+  // not a hand edit. Sections the user hid are left out here too.
   const cvText = useMemo(() => {
-    if (report.improvedCvText.trim()) return report.improvedCvText;
-    const applied = applySuggestions(report.cvText, report.suggestions, report.decisions);
-    return layoutToText(layoutCv(applied.segments));
-  }, [report.cvText, report.improvedCvText, report.suggestions, report.decisions]);
+    const handEdited = report.improvedCvText.trim() && report.improvedCvText !== report.cvText;
+    const base = handEdited
+      ? report.improvedCvText
+      : layoutToText(layoutCv(applySuggestions(report.cvText, report.suggestions, report.decisions).segments));
+    return layoutToText(withoutSections(layoutText(base), report.hiddenSections ?? []));
+  }, [report.cvText, report.improvedCvText, report.suggestions, report.decisions, report.hiddenSections]);
 
   const layout = useMemo(() => layoutText(cvText), [cvText]);
   const candidateName = layout.name?.text;
@@ -113,7 +118,7 @@ export function CoverLetterTab({
           ...options,
           hiringManager: options.hiringManager?.trim() || undefined,
           motivation: options.motivation?.trim() || undefined,
-          cvText: cvText.slice(0, LIMITS.cvChars),
+          cvText: stripInline(cvText).slice(0, LIMITS.cvChars),
           jobText: report.jobText.slice(0, LIMITS.jobChars),
           jobTitle: report.jobTitle,
           company: report.company,

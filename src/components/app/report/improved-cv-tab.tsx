@@ -1,13 +1,21 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Copy, Download, Palette, Pencil, RefreshCw, Sparkles } from "lucide-react";
+import { Copy, Download, Palette, Pencil, RefreshCw, RotateCcw, Sparkles } from "lucide-react";
 import { Card, Eyebrow } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tag } from "@/components/ui/tag";
-import { TextAreaField } from "@/components/ui/field";
 import { applySuggestions, countApplied } from "@/lib/analysis/apply";
-import { layoutCv, layoutText, layoutToText } from "@/lib/analysis/cv-layout";
+import {
+  layoutCv,
+  layoutText,
+  layoutToText,
+  moveSection,
+  renameSection,
+  cleanHeading,
+  withoutSections,
+} from "@/lib/analysis/cv-layout";
+import { stripInline } from "@/lib/analysis/inline";
 import type { CvStyle } from "@/lib/cv-templates";
 import { buildCvDocx, cvFilename, downloadBlob } from "@/lib/export/cv-docx";
 import { buildCvPdf } from "@/lib/export/cv-pdf";
@@ -15,7 +23,9 @@ import { LIMITS } from "@/lib/config";
 import { loadCvStyle, saveCvStyle } from "@/lib/store/local";
 import type { Report } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { CvEditor } from "./cv-editor";
 import { CvPage } from "./cv-page";
+import { SectionsPanel } from "./sections-panel";
 import { TemplatePicker } from "./template-picker";
 
 /**
@@ -40,12 +50,14 @@ export function ImprovedCvTab({
   onRecheck,
   recheckBusy,
   onTextChange,
+  onHiddenChange,
 }: {
   report: Report;
   onRecheck: (text: string) => void;
   recheckBusy: boolean;
   /** Persists hand edits back onto the report. */
   onTextChange: (text: string) => void;
+  onHiddenChange: (headings: string[]) => void;
 }) {
   const applied = useMemo(
     () => applySuggestions(report.cvText, report.suggestions, report.decisions),
@@ -78,23 +90,51 @@ export function ImprovedCvTab({
    * suggestion is picked up immediately with no effect to fire — and once the
    * user has typed, their text wins and is never silently overwritten.
    */
-  const [manual, setManual] = useState<string | null>(null);
+  // A hand edit saved on the report is picked up again; the report starts
+  // with `improvedCvText` equal to the original CV, which is not an edit.
+  const [manual, setManual] = useState<string | null>(() =>
+    report.improvedCvText && report.improvedCvText !== report.cvText ? report.improvedCvText : null,
+  );
 
   const edited = manual !== null && manual !== structured;
   const text = manual ?? structured;
+  const hidden = report.hiddenSections ?? [];
+
+  // Hand edits are laid out again, so they get the same structure.
+  const full = edited ? layoutText(text) : layout;
+  const shown = withoutSections(full, hidden);
+  // What leaves the page — copy, download, re-check — skips hidden sections.
+  const visibleText = hidden.length > 0 ? layoutToText(shown) : text;
+
+  /** Section edits change the text, like a hand edit. */
+  const editText = (next: string) => {
+    setManual(next);
+    onTextChange(next);
+  };
+
+  const moveTo = (from: number, to: number) => editText(moveSection(text, from, to));
+
+  const rename = (index: number, heading: string) => {
+    const before = full.sections[index]?.heading;
+    const after = cleanHeading(heading);
+    if (!before || !after || before === after) return;
+    editText(renameSection(text, index, heading));
+    if (hidden.includes(before)) onHiddenChange(hidden.map((h) => (h === before ? after : h)));
+  };
+
+  const toggleHidden = (heading: string) =>
+    onHiddenChange(hidden.includes(heading) ? hidden.filter((h) => h !== heading) : [...hidden, heading]);
 
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(text);
+      // Plain text for pasting into job portals: no formatting markers.
+      await navigator.clipboard.writeText(stripInline(visibleText));
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     } catch {
       // Clipboard permission can be refused; the text stays selectable.
     }
   };
-
-  // Hand edits are laid out again, so they get the same structure.
-  const shown = edited ? layoutText(text) : layout;
 
   const download = async (format: "pdf" | "docx") => {
     setExporting(format);
@@ -154,9 +194,9 @@ export function ImprovedCvTab({
               size="sm"
               onClick={() => {
                 onTextChange(text);
-                onRecheck(text);
+                onRecheck(visibleText);
               }}
-              disabled={recheckBusy || text.trim().length < LIMITS.cvMinChars}
+              disabled={recheckBusy || stripInline(visibleText).trim().length < LIMITS.cvMinChars}
             >
               <RefreshCw
                 className={cn("size-3.5", recheckBusy && "animate-spin motion-reduce:animate-none")}
@@ -197,7 +237,21 @@ export function ImprovedCvTab({
             {edited ? <Tag tone="yellow">Edited by you</Tag> : null}
           </div>
 
-          <div className="flex shrink-0 gap-1">
+          <div className="flex shrink-0 flex-wrap justify-end gap-1">
+            {edited && !editing ? (
+              <Button
+                tone="ghost"
+                size="sm"
+                onClick={() => {
+                  setManual(null);
+                  // The original CV on the report means "no hand edit".
+                  onTextChange(report.cvText);
+                }}
+              >
+                <RotateCcw className="size-3.5" aria-hidden="true" />
+                Undo edits
+              </Button>
+            ) : null}
             <Button
               tone="ghost"
               size="sm"
@@ -230,21 +284,22 @@ export function ImprovedCvTab({
 
         {showDesign ? (
           <div className="border-b border-line px-5 py-5">
-            <TemplatePicker layout={shown} value={style} onChange={changeStyle} />
+            <div className="flex flex-col gap-6">
+              <TemplatePicker layout={shown} value={style} onChange={changeStyle} />
+              <SectionsPanel
+                sections={full.sections}
+                hidden={hidden}
+                onMove={moveTo}
+                onRename={rename}
+                onToggleHidden={toggleHidden}
+              />
+            </div>
           </div>
         ) : null}
 
         <div className="bg-sand/60 p-3 sm:p-6">
           {editing ? (
-            <TextAreaField
-              label="Your improved CV"
-              hideLabel
-              value={text}
-              onChange={(event) => setManual(event.target.value)}
-              rows={24}
-              limit={LIMITS.cvChars}
-              className="font-mono"
-            />
+            <CvEditor value={text} onChange={setManual} />
           ) : (
             <CvPage layout={shown} style={style} />
           )}

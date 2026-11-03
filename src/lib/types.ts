@@ -238,6 +238,8 @@ export type Report = {
   warnings: ExtractionWarning[];
   /** The cover letter, once one has been written for this job. */
   coverLetter?: CoverLetter;
+  /** Section headings the user hid from the improved CV. */
+  hiddenSections?: string[];
 };
 
 /* -------------------------------------------------------------------------- */

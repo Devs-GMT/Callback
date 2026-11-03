@@ -2,6 +2,7 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { orgPrefix, type CvLayout, type CvLine } from "@/lib/analysis/cv-layout";
+import { contactRuns, parseInline, stripInline, type InlineRun } from "@/lib/analysis/inline";
 import {
   CV_HAIRLINE,
   headerRule,
@@ -26,6 +27,25 @@ import { cn } from "@/lib/utils";
 
 /** `n` points on an A4 page as wide as the container. */
 export const pt = (n: number) => `calc(${n.toFixed(2)} * 100cqw / ${CV_PAGE.width})`;
+
+/** Text with its bold, italic and link markers rendered. */
+export function Inline({ text, runs }: { text?: string; runs?: InlineRun[] }) {
+  return (runs ?? parseInline(text ?? "")).map((run, index) => {
+    const style: CSSProperties = {
+      fontWeight: run.bold ? 700 : undefined,
+      fontStyle: run.italic ? "italic" : undefined,
+    };
+    return run.href ? (
+      <a key={index} href={run.href} target="_blank" rel="noopener noreferrer" style={{ ...style, color: "inherit" }}>
+        {run.text}
+      </a>
+    ) : (
+      <span key={index} style={style}>
+        {run.text}
+      </span>
+    );
+  });
+}
 
 const FAMILY: Record<FontFamily, string> = {
   sans: "var(--font-inter), Arial, sans-serif",
@@ -110,7 +130,7 @@ export function CvHeader({
             marginBottom: pt(s.size.name * 0.28),
           }}
         >
-          <span {...changedProps(name)}>{name.text}</span>
+          <span {...changedProps(name)}>{stripInline(name.text)}</span>
         </h2>
       ) : null}
       {headline ? (
@@ -123,12 +143,12 @@ export function CvHeader({
             marginBottom: pt(3),
           }}
         >
-          <span {...changedProps(headline)}>{headline.text}</span>
+          <span {...changedProps(headline)}><Inline text={headline.text} /></span>
         </p>
       ) : null}
       {lines.map((line, index) => (
         <p key={index} style={{ fontSize: pt(s.size.small), color: line.links ? s.accent : CV_MUTED }}>
-          <span {...changedProps(line)}>{line.text}</span>
+          <span {...changedProps(line)}><Inline runs={contactRuns(line.text)} /></span>
         </p>
       ))}
     </header>
@@ -184,7 +204,7 @@ export function CvLines({ s, lines }: { s: ResolvedCvStyle; lines: CvLine[] }) {
                   className="list-disc marker:text-[#1a1a1a]"
                   style={{ marginTop: i === 0 ? 0 : pt(s.space.item) }}
                 >
-                  <span {...changedProps(line)}>{line.text}</span>
+                  <span {...changedProps(line)}><Inline text={line.text} /></span>
                 </li>
               ))}
             </ul>
@@ -199,13 +219,13 @@ export function CvLines({ s, lines }: { s: ResolvedCvStyle; lines: CvLine[] }) {
         if (block.kind === "subtitle") {
           return (
             <p key={index} style={{ fontStyle: "italic", color: CV_MUTED }}>
-              <span {...changedProps(block)}>{block.text}</span>
+              <span {...changedProps(block)}><Inline text={block.text} /></span>
             </p>
           );
         }
         return (
           <p key={index} style={{ marginTop: top ?? pt(s.space.item) }}>
-            <span {...changedProps(block)}>{block.text}</span>
+            <span {...changedProps(block)}><Inline text={block.text} /></span>
           </p>
         );
       })}
@@ -222,8 +242,8 @@ function CvEntry({ s, line, first }: { s: ResolvedCvStyle; line: CvLine; first: 
     >
       <p className="min-w-0">
         <span {...changedProps(line)}>
-          <span style={{ fontWeight: 600 }}>{parts ? parts.title : line.text}</span>
-          {parts?.org ? <span>{orgPrefix(parts)}{parts.org}</span> : null}
+          <span style={{ fontWeight: 600 }}><Inline text={parts ? parts.title : line.text} /></span>
+          {parts?.org ? <span>{orgPrefix(parts)}<Inline text={parts.org} /></span> : null}
         </span>
       </p>
       {parts?.dates ? (

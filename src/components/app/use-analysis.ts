@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import { analyzeFit, ApiCallError, requestPivot } from "@/lib/api/client";
 import { computeAts } from "@/lib/analysis/ats";
+import { stripInline } from "@/lib/analysis/inline";
 import { buildMatchReport, gapsFrom } from "@/lib/analysis/match";
 import { saveReportAndNotify } from "@/lib/store/local";
 import { localId } from "@/lib/utils";
@@ -14,6 +15,9 @@ import type {
   Suggestion,
   SuggestionDecision,
 } from "@/lib/types";
+
+/** The CV as the checks and the model see it: formatting markers removed. */
+const plainCv = (cv: CvInput): CvInput => ({ ...cv, text: stripInline(cv.text) });
 
 /**
  * Running an analysis end to end.
@@ -110,7 +114,7 @@ export function useAnalysis() {
 
     // Needs nothing from the network, so it is ready before the model is asked
     // anything. This is what makes the `partial` outcome possible.
-    const ruleBasedAts = computeAts(cv);
+    const ruleBasedAts = computeAts(plainCv(cv));
 
     const baseReport = (
       overrides: Partial<Report> = {},
@@ -143,7 +147,7 @@ export function useAnalysis() {
     try {
       analysis = await analyzeFit(
         {
-          cvText: cv.text,
+          cvText: stripInline(cv.text),
           jobText: job.text,
           jobTitle: job.title,
           seniority: job.seniority,
@@ -170,8 +174,8 @@ export function useAnalysis() {
 
     // Recompute the ATS score now the model has judged bullet quality, which
     // is the one check PRD section 3 marks as AI-assisted.
-    const ats = computeAts(cv, analysis.bulletQuality);
-    const match = buildMatchReport(analysis, cv.text, job.text);
+    const ats = computeAts(plainCv(cv), analysis.bulletQuality);
+    const match = buildMatchReport(analysis, stripInline(cv.text), job.text);
 
     /* ---------------- the suggestions ---------------- */
 
@@ -184,7 +188,7 @@ export function useAnalysis() {
     try {
       const pivot = await requestPivot(
         {
-          cvText: cv.text,
+          cvText: stripInline(cv.text),
           jobText: job.text,
           jobTitle: job.title,
           gaps: gapsFrom(match).map(
@@ -235,7 +239,7 @@ export function useAnalysis() {
       try {
         const analysis = await analyzeFit(
           {
-            cvText: cv.text,
+            cvText: stripInline(cv.text),
             jobText: job.text,
             jobTitle: job.title,
             seniority: job.seniority,
@@ -243,8 +247,8 @@ export function useAnalysis() {
           controller.signal,
         );
 
-        const ats = computeAts(cv, analysis.bulletQuality);
-        const match = buildMatchReport(analysis, cv.text, job.text);
+        const ats = computeAts(plainCv(cv), analysis.bulletQuality);
+        const match = buildMatchReport(analysis, stripInline(cv.text), job.text);
 
         setState({ phase: "running", step: "pivot" });
 
@@ -252,7 +256,7 @@ export function useAnalysis() {
         try {
           const pivot = await requestPivot(
             {
-              cvText: cv.text,
+              cvText: stripInline(cv.text),
               jobText: job.text,
               jobTitle: job.title,
               gaps: gapsFrom(match).map((requirement) => requirement.text),

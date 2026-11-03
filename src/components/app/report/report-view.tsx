@@ -74,6 +74,11 @@ export function ReportView({
     [onUpdate, report],
   );
 
+  const setHiddenSections = useCallback(
+    (hiddenSections: string[]) => onUpdate({ ...report, hiddenSections }),
+    [onUpdate, report],
+  );
+
   const setCoverLetter = useCallback(
     (coverLetter: CoverLetter) => onUpdate({ ...report, coverLetter }),
     [onUpdate, report],
@@ -271,6 +276,7 @@ export function ReportView({
                 onRecheck={onRecheck}
                 recheckBusy={recheckBusy}
                 onTextChange={setImprovedText}
+                onHiddenChange={setHiddenSections}
               />
             </TabPanel>
           ) : null}
