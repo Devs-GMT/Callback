@@ -131,6 +131,24 @@ describe("layoutCv header", () => {
     assert.equal(isHeading("Led several projects"), false);
   });
 
+  it("keeps a name and headline written in capitals in the header", () => {
+    const result = layoutText(
+      `BAYU APRIANSYAH PUTRA
+WEB3 PROJECT BUILDER | BACKEND DEVELOPER
+Yogyakarta, Indonesia • 087802473448 • bayu@example.com
+PROFESSIONAL SUMMARY
+Informatics student building REST APIs.
+WORK EXPERIENCE
+- Built things`,
+    );
+    assert.equal(result.name?.text, "BAYU APRIANSYAH PUTRA");
+    assert.equal(result.headline?.text, "WEB3 PROJECT BUILDER | BACKEND DEVELOPER");
+    assert.deepEqual(
+      result.sections.map((section) => section.heading),
+      ["PROFESSIONAL SUMMARY", "WORK EXPERIENCE"],
+    );
+  });
+
   it("splits an existing contact line and puts profile links on their own line", () => {
     const result = layoutText(
       `Bayu Putra

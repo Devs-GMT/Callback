@@ -170,21 +170,21 @@ function headingText(raw: string): string {
   return raw.trim().replace(/\s*:$/, "").replace(/\s+/g, " ").toUpperCase();
 }
 
+type Part = { heading: string; source: string; base: Pick<CvLine, "changed" | "replaced"> } | { line: CvLine };
+
 /** Split a single segment into the heading and/or content lines it holds. */
-function classify(
-  segment: CvSegment,
-): Array<{ heading: string } | { line: CvLine }> {
+function classify(segment: CvSegment): Part[] {
   const raw = segment.text;
   const trimmed = raw.trim();
   const base = { changed: segment.changed, replaced: segment.replaced };
 
   if (trimmed.length === 0) return [{ line: { kind: "gap", text: "", ...base } }];
-  if (isHeading(raw)) return [{ heading: headingText(trimmed) }];
+  if (isHeading(raw)) return [{ heading: headingText(trimmed), source: trimmed, base }];
 
   const inline = trimmed.match(INLINE_HEADING);
   if (inline) {
     return [
-      { heading: headingText(inline[1]) },
+      { heading: headingText(inline[1]), source: inline[1], base },
       { line: { kind: "text", text: inline[2].trim(), ...base } },
     ];
   }
@@ -219,8 +219,29 @@ function tidy(lines: CvLine[]): CvLine[] {
   });
 }
 
+/** A heading that is a known section name, not just a line in capitals. */
+const isKnownHeading = (text: string) =>
+  KNOWN_HEADING.test(text) || INLINE_HEADING.test(text) || QUALIFIED_HEADING.test(text);
+
+/**
+ * Many CVs set the name and headline in capitals ("BAYU PUTRA", "BACKEND
+ * DEVELOPER"), which read like headings. A capitals line above the contact
+ * details that is not a known section name is part of the header instead.
+ */
+function demoteHeaderCaps(parts: Part[]): Part[] {
+  const contactAt = parts.findIndex(
+    (part, index) => index < 8 && "line" in part && CONTACT_HINT.test(part.line.text),
+  );
+  if (contactAt === -1) return parts;
+  return parts.map((part, index) =>
+    index < contactAt && "heading" in part && !isKnownHeading(part.source)
+      ? { line: { kind: "text", text: part.source.replace(/\s+/g, " "), ...part.base } }
+      : part,
+  );
+}
+
 export function layoutCv(segments: CvSegment[]): CvLayout {
-  const parts = segments.flatMap(classify);
+  const parts = demoteHeaderCaps(segments.flatMap(classify));
   const firstHeading = parts.findIndex((part) => "heading" in part);
   const preamble = (firstHeading === -1 ? parts : parts.slice(0, firstHeading))
     .map((part) => ("line" in part ? part.line : null))
