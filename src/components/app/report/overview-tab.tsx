@@ -100,7 +100,7 @@ export function OverviewTab({
             <Eyebrow on="dark" className="relative mb-3">
               The verdict
             </Eyebrow>
-            <p className="relative max-w-[60ch] font-serif text-[21px] leading-[1.45] text-white">
+            <p className="relative max-w-[60ch] font-serif text-[18px] leading-[1.45] text-white sm:text-[21px]">
               {report.match.verdict}
             </p>
           </Card>
@@ -146,25 +146,16 @@ export function OverviewTab({
             ))}
           </div>
 
-          <div className="mt-4 flex flex-wrap gap-2">
-            <MatchTag status="matched" />
-            <span className="text-[12.5px] tabular-nums text-muted">
-              {tally.matched}
-            </span>
-            <span className="mx-1 text-line" aria-hidden="true">
-              |
-            </span>
-            <MatchTag status="partial" />
-            <span className="text-[12.5px] tabular-nums text-muted">
-              {tally.partial}
-            </span>
-            <span className="mx-1 text-line" aria-hidden="true">
-              |
-            </span>
-            <MatchTag status="missing" />
-            <span className="text-[12.5px] tabular-nums text-muted">
-              {tally.missing}
-            </span>
+          {/* Each tag keeps its count beside it, so a wrap never strands a number. */}
+          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
+            {(["matched", "partial", "missing"] as const).map((status) => (
+              <span key={status} className="inline-flex items-center gap-1.5">
+                <MatchTag status={status} />
+                <span className="text-[12.5px] tabular-nums text-muted">
+                  {tally[status]}
+                </span>
+              </span>
+            ))}
           </div>
 
           {report.match.seniority.mismatch ? (

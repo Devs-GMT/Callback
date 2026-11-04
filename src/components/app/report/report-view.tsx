@@ -208,10 +208,13 @@ export function ReportView({
 
       <div className="flex flex-col gap-6 xl:flex-row xl:items-start">
         <div className="min-w-0 flex-1">
-          {/* Below xl the panel is stacked above the tabs rather than beside
+          {/* Tablet: the panel is stacked above the tabs rather than beside
               them, which is PRD section 8's "sticky panel becomes a score bar
-              at the top" for tablet. */}
-          <div className="mb-6 xl:hidden">{panel}</div>
+              at the top". Phones skip it: the bottom bar already carries the
+              scores and Re-check, and Overview shows the gauges and top fixes,
+              so stacking it here only pushed the tabs a screen and a half
+              down. Export and stamp follow the tab content instead. */}
+          <div className="mb-6 hidden md:block xl:hidden">{panel}</div>
 
           <Tabs
             items={tabItems}
@@ -286,6 +289,14 @@ export function ReportView({
               <CoverLetterTab report={report} onChange={setCoverLetter} />
             </TabPanel>
           ) : null}
+
+          <div className="mt-8 md:hidden">
+            <StampPanel
+              report={report}
+              parentOnChainId={parentOnChainId}
+              onStamped={onStamped}
+            />
+          </div>
         </div>
 
         {/* ---------- Sticky panel, desktop only (PRD section 7) ---------- */}
