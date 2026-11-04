@@ -316,7 +316,7 @@ export function WhatItDoes() {
   const { active, register } = useActiveBlock(BLOCKS.length);
 
   return (
-    <section id="features" className="section-dark relative overflow-clip py-20 md:py-32">
+    <section id="features" className="section-dark relative overflow-clip pb-20 pt-12 md:py-32">
       <div
         className="glow-lilac pointer-events-none absolute -left-60 top-1/3 size-[620px] opacity-25 blur-3xl"
         aria-hidden="true"

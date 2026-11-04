@@ -149,7 +149,7 @@ export function Hero() {
   const copyOpacity = useTransform(scrollYProgress, [0, 0.7], [1, 0]);
 
   return (
-    <section className="section-dark relative -mt-[76px] overflow-hidden pb-16 pt-[100px] md:-mt-[88px] md:pt-[116px] md:pb-24">
+    <section className="section-dark relative -mt-[76px] overflow-hidden pb-8 pt-[100px] md:-mt-[88px] md:pt-[116px] md:pb-24">
       {/* A soft lilac bloom behind the card, so the espresso isn't flat. */}
       <div
         className="glow-lilac pointer-events-none absolute -right-40 -top-40 size-[640px] opacity-40 blur-2xl"

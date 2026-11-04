@@ -17,7 +17,7 @@ import personaPhoto from "../../../../public/images/persona-alex.jpg";
  */
 export function SampleStory() {
   return (
-    <section id="sample" className="section-light relative overflow-hidden py-20 md:py-32">
+    <section id="sample" className="section-light relative overflow-hidden pb-20 pt-4 md:py-32">
       <div className="shell grid items-center gap-16 lg:grid-cols-[1.1fr_0.9fr] lg:gap-20">
         {/* ---------- The quote ---------- */}
         <div>

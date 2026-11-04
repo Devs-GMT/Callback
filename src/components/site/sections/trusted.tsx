@@ -58,8 +58,11 @@ export function Trusted() {
   const { active, register, setActive } = useActiveBlock(PILLARS.length);
   const current = PILLARS[active];
 
+  // overflow-x-clip: the tilted torn-paper frame pokes a few pixels past the
+  // edge on phones, which let the whole page wobble sideways. Clip, not
+  // hidden, so nothing inside stops being sticky.
   return (
-    <section id="who" className="section-light relative py-20 md:py-32">
+    <section id="who" className="section-light relative overflow-x-clip py-20 md:py-32">
       <div className="shell">
         <Reveal>
           <p className="eyebrow mb-4">Built to be trusted</p>

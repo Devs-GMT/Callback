@@ -49,7 +49,7 @@ export function HowItWorks() {
   const { active, register, setActive } = useActiveBlock(STEPS.length);
 
   return (
-    <section id="how" className="section-light py-20 md:py-28">
+    <section id="how" className="section-light pb-20 pt-2 md:py-28">
       <div className="shell">
         <Reveal
           scale={0.97}

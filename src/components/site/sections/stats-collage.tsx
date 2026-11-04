@@ -105,19 +105,24 @@ export function StatsCollage() {
 
     void fetchStats().then((result) => {
       if (cancelled || !result) return;
-      setStats((current) => [
-        {
+      // A "0" leads with nothing to show, so a total only appears once it has
+      // something in it.
+      const live: Stat[] = [];
+      if (result.reports > 0) {
+        live.push({
           value: formatCount(result.reports),
           label: "reports stamped on BOT Chain",
           note: "Every one verifiable on the explorer, with no personal data on-chain.",
-        },
-        {
+        });
+      }
+      if (result.rechecks > 0) {
+        live.push({
           value: formatCount(result.rechecks),
           label: "re-checks recorded",
           note: "A re-check links to the report it improved on, so progress is provable.",
-        },
-        ...current,
-      ]);
+        });
+      }
+      if (live.length > 0) setStats((current) => [...live, ...current]);
     });
 
     return () => {
@@ -139,7 +144,11 @@ export function StatsCollage() {
 
   return (
     <section className="section-light relative overflow-hidden py-20 md:py-32">
-      <div className="shell grid gap-14 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-16">
+      {/* `minmax(0, …)` on mobile too: without it the single column grows to
+          the carousel's full width (six cards, ~1,700px), the section clips
+          it, and the reveals never see enough of themselves to fire —
+          leaving a blank band where the stat and the cards should be. */}
+      <div className="shell grid grid-cols-[minmax(0,1fr)] gap-14 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-16">
         {/* ---------- Left: headline and the rotating stat ---------- */}
         <div>
           <Reveal>
@@ -198,7 +207,7 @@ export function StatsCollage() {
         </div>
 
         {/* ---------- Right: the collage carousel ---------- */}
-        <Reveal delay={0.15} x={40} y={0}>
+        <Reveal delay={0.15} x={40} y={0} className="min-w-0">
           {/* A scroll-snap row rather than a transform carousel: it is
               swipeable on touch, scrollable with a trackpad, keyboard
               reachable, and needs no JS to be usable at all. */}
