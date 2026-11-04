@@ -1,6 +1,9 @@
+"use client";
+
 import type { ReactNode } from "react";
 import type { CheckState, MatchStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/i18n/client";
 
 /**
  * The small status tags from PRD section 9.
@@ -50,11 +53,11 @@ export function Tag({ tone = "neutral", children, className }: TagProps) {
 
 const MATCH_PRESENTATION: Record<
   MatchStatus,
-  { tone: TagTone; glyph: string; label: string }
+  { tone: TagTone; glyph: string }
 > = {
-  matched: { tone: "mint", glyph: "✓", label: "Matched" },
-  partial: { tone: "yellow", glyph: "◐", label: "Partial" },
-  missing: { tone: "coral", glyph: "✗", label: "Missing" },
+  matched: { tone: "mint", glyph: "✓" },
+  partial: { tone: "yellow", glyph: "◐" },
+  missing: { tone: "coral", glyph: "✗" },
 };
 
 export function MatchTag({
@@ -64,7 +67,8 @@ export function MatchTag({
   status: MatchStatus;
   className?: string;
 }) {
-  const { tone, glyph, label } = MATCH_PRESENTATION[status];
+  const { tone, glyph } = MATCH_PRESENTATION[status];
+  const label = useI18n().t.app.ui.match[status];
   return (
     <Tag tone={tone} className={className}>
       <span aria-hidden="true">{glyph}</span>
@@ -75,11 +79,11 @@ export function MatchTag({
 
 const CHECK_PRESENTATION: Record<
   CheckState,
-  { tone: TagTone; glyph: string; label: string }
+  { tone: TagTone; glyph: string }
 > = {
-  pass: { tone: "mint", glyph: "✓", label: "Pass" },
-  warn: { tone: "yellow", glyph: "⚠", label: "Check" },
-  fail: { tone: "coral", glyph: "✗", label: "Fix" },
+  pass: { tone: "mint", glyph: "✓" },
+  warn: { tone: "yellow", glyph: "⚠" },
+  fail: { tone: "coral", glyph: "✗" },
 };
 
 export function CheckTag({
@@ -89,7 +93,8 @@ export function CheckTag({
   state: CheckState;
   className?: string;
 }) {
-  const { tone, glyph, label } = CHECK_PRESENTATION[state];
+  const { tone, glyph } = CHECK_PRESENTATION[state];
+  const label = useI18n().t.app.ui.check[state];
   return (
     <Tag tone={tone} className={className}>
       <span aria-hidden="true">{glyph}</span>
@@ -103,7 +108,8 @@ export function CheckTag({
  * heading already names the check.
  */
 export function CheckGlyph({ state }: { state: CheckState }) {
-  const { tone, glyph, label } = CHECK_PRESENTATION[state];
+  const { tone, glyph } = CHECK_PRESENTATION[state];
+  const label = useI18n().t.app.ui.check[state];
   return (
     <span
       className={cn(

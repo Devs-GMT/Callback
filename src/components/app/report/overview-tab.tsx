@@ -9,6 +9,8 @@ import { CheckGlyph, MatchTag, Tag } from "@/components/ui/tag";
 import { topFixes } from "@/lib/analysis/ats";
 import { matchTally } from "@/lib/analysis/match";
 import type { Report } from "@/lib/types";
+import { useI18n } from "@/i18n/client";
+import { fmt } from "@/i18n/config";
 
 /** Cards on the overview arrive one after another. */
 const list = {
@@ -37,6 +39,7 @@ export function OverviewTab({
 }) {
   const fixes = topFixes(report.ats, 3);
   const tally = matchTally(report.match);
+  const o = useI18n().t.report.overview;
   const hasMatch = report.match.requirements.length > 0;
   const previous = report.previousScores;
 
@@ -48,22 +51,21 @@ export function OverviewTab({
         <div className="flex flex-wrap items-center justify-center gap-8 sm:justify-start sm:gap-12">
           <Gauge
             value={report.ats.score}
-            label="ATS score"
-            caption={previous ? `was ${previous.ats}` : "out of 100"}
+            label={o.atsScore}
+            caption={previous ? fmt(o.was, { value: previous.ats }) : o.outOf}
           />
           {hasMatch ? (
             <Gauge
               value={report.match.score}
-              label="Job match"
+              label={o.jobMatch}
               unit="%"
-              caption={previous ? `was ${previous.match}%` : "against this job"}
+              caption={previous ? fmt(o.was, { value: `${previous.match}%` }) : o.againstJob}
             />
           ) : (
             <div className="max-w-[260px]">
-              <Eyebrow className="mb-2">Job match</Eyebrow>
+              <Eyebrow className="mb-2">{o.jobMatch}</Eyebrow>
               <p className="text-[13px] leading-relaxed text-muted">
-                The job match didn&apos;t run for this report. Your ATS check is
-                complete and scored below.
+                {o.noMatch}
               </p>
             </div>
           )}
@@ -72,12 +74,12 @@ export function OverviewTab({
         {previous ? (
           <div className="grid gap-4 border-t border-line pt-5 sm:grid-cols-2">
             <BeforeAfterBar
-              label="ATS score"
+              label={o.atsScore}
               before={previous.ats}
               after={report.ats.score}
             />
             <BeforeAfterBar
-              label="Job match"
+              label={o.jobMatch}
               before={previous.match}
               after={report.match.score}
               unit="%"
@@ -98,7 +100,7 @@ export function OverviewTab({
               &rdquo;
             </span>
             <Eyebrow on="dark" className="relative mb-3">
-              The verdict
+              {o.verdict}
             </Eyebrow>
             <p className="relative max-w-[60ch] font-serif text-[18px] leading-[1.45] text-white sm:text-[21px]">
               {report.match.verdict}
@@ -113,9 +115,9 @@ export function OverviewTab({
         <Card>
           <div className="flex items-start justify-between gap-4">
             <div>
-              <Eyebrow className="mb-2">Requirements</Eyebrow>
+              <Eyebrow className="mb-2">{o.requirements}</Eyebrow>
               <p className="text-[13px] leading-relaxed text-muted">
-                {report.match.requirements.length} requirements read from this job.
+                {fmt(o.requirementsRead, { count: report.match.requirements.length })}
               </p>
             </div>
             <button
@@ -123,7 +125,7 @@ export function OverviewTab({
               onClick={() => onGoToTab("match")}
               className="inline-flex min-h-11 shrink-0 items-center gap-1.5 text-[12.5px] font-medium text-ink transition-colors hover:text-muted md:min-h-0"
             >
-              See the table
+              {o.seeTable}
               <ArrowRight className="size-3.5" aria-hidden="true" />
             </button>
           </div>
@@ -160,14 +162,14 @@ export function OverviewTab({
 
           {report.match.seniority.mismatch ? (
             <p className="mt-4 rounded-[4px] bg-yellow/50 px-3 py-2.5 text-[12px] leading-relaxed text-yellow-ink">
-              <span className="font-medium">Seniority: </span>
+              <span className="font-medium">{o.seniority}</span>
               {report.match.seniority.note}
             </p>
           ) : null}
 
           {report.match.redFlags.length > 0 ? (
             <div className="mt-4">
-              <Eyebrow className="mb-2">Watch out for</Eyebrow>
+              <Eyebrow className="mb-2">{o.watchOut}</Eyebrow>
               <ul className="flex flex-col gap-1.5">
                 {report.match.redFlags.map((flag, index) => (
                   <li
@@ -175,7 +177,7 @@ export function OverviewTab({
                     className="flex items-start gap-2 text-[12.5px] leading-relaxed text-ink"
                   >
                     <Tag tone="coral" className="mt-px shrink-0">
-                      {flag.kind}
+                      {o.flagKinds[flag.kind] ?? flag.kind}
                     </Tag>
                     <span>{flag.text}</span>
                   </li>
@@ -193,12 +195,12 @@ export function OverviewTab({
         <div className="flex items-start justify-between gap-4">
           <div>
             <Eyebrow className="mb-2">
-              {fixes.length === 0 ? "Nothing to fix" : `Top ${fixes.length} fixes`}
+              {fixes.length === 0 ? o.nothingToFix : fmt(o.topFixes, { count: fixes.length })}
             </Eyebrow>
             <p className="text-[13px] leading-relaxed text-muted">
               {fixes.length === 0
-                ? "Every ATS check passed. Focus on the job match instead."
-                : "The changes that would move your ATS score most."}
+                ? o.allPassed
+                : o.mostMove}
             </p>
           </div>
           <button
@@ -206,7 +208,7 @@ export function OverviewTab({
             onClick={() => onGoToTab(fixes.length === 0 ? "pivot" : "ats")}
             className="inline-flex min-h-11 shrink-0 items-center gap-1.5 text-[12.5px] font-medium text-ink transition-colors hover:text-muted md:min-h-0"
           >
-            {fixes.length === 0 ? "What to pivot" : "All checks"}
+            {fixes.length === 0 ? o.toPivot : o.allChecks}
             <ArrowRight className="size-3.5" aria-hidden="true" />
           </button>
         </div>

@@ -14,6 +14,8 @@ import { extractDocx, DocxUnreadableError } from "@/lib/extract/docx";
 import { extractPdf, PdfTooManyPagesError, PdfUnreadableError } from "@/lib/extract/pdf";
 import type { CvInput, ExtractionWarning, JobInput } from "@/lib/types";
 import type { ApiError } from "@/lib/types";
+import { fmt } from "@/i18n/config";
+import { clientMessages, getRuntimeLocale } from "@/i18n/lib";
 
 export type ExtractionErrorKind =
   | "too-big"
@@ -81,14 +83,13 @@ function classify(file: File): FileKind | null {
 /** Extract CV text from an uploaded PDF or DOCX. */
 export async function extractFromFile(file: File): Promise<CvInput> {
   const kind = classify(file);
+  const m = clientMessages().extract;
 
   if (!kind) {
     const isLegacyDoc = file.name.toLowerCase().endsWith(".doc");
     throw new ExtractionError(
       "wrong-type",
-      isLegacyDoc
-        ? "We can read .docx but not the older .doc format. Open it in Word and save as .docx, or paste the text."
-        : "We can read PDF and Word (.docx) files. Paste the text instead if your CV is in another format.",
+      isLegacyDoc ? m.legacyDoc : m.wrongType,
       { suggestPaste: true },
     );
   }
@@ -96,13 +97,13 @@ export async function extractFromFile(file: File): Promise<CvInput> {
   if (file.size > LIMITS.fileBytes) {
     throw new ExtractionError(
       "too-big",
-      `That file is ${formatBytes(file.size)}. The limit is ${formatBytes(LIMITS.fileBytes)} — try exporting it again, or paste the text.`,
+      fmt(m.tooBig, { size: formatBytes(file.size), limit: formatBytes(LIMITS.fileBytes) }),
       { suggestPaste: true },
     );
   }
 
   if (file.size === 0) {
-    throw new ExtractionError("unreadable", "That file is empty.", {
+    throw new ExtractionError("unreadable", m.empty, {
       suggestPaste: true,
     });
   }
@@ -126,7 +127,7 @@ export async function extractFromFile(file: File): Promise<CvInput> {
     if (error instanceof PdfTooManyPagesError) {
       throw new ExtractionError(
         "too-many-pages",
-        `That PDF has ${error.pageCount} pages. We read up to ${LIMITS.pdfPages} — most CVs should be 1 to 2 anyway.`,
+        fmt(m.tooManyPages, { pages: error.pageCount, limit: LIMITS.pdfPages }),
       );
     }
     if (error instanceof PdfUnreadableError || error instanceof DocxUnreadableError) {
@@ -134,7 +135,7 @@ export async function extractFromFile(file: File): Promise<CvInput> {
     }
     throw new ExtractionError(
       "unreadable",
-      "Something went wrong reading that file. Paste the text instead.",
+      m.readFailed,
       { suggestPaste: true },
     );
   }
@@ -146,9 +147,7 @@ export async function extractFromFile(file: File): Promise<CvInput> {
   if (normalised.replace(/\s/g, "").length < 60) {
     throw new ExtractionError(
       "unreadable",
-      kind === "pdf"
-        ? "We can't read any text in this PDF — it looks like a scan or an image. Export it as a text-based PDF, or paste the text."
-        : "We couldn't find any text in that Word file. Paste the text instead.",
+      kind === "pdf" ? m.pdfNoText : m.docxNoText,
       { suggestPaste: true },
     );
   }
@@ -169,18 +168,23 @@ export async function extractFromFile(file: File): Promise<CvInput> {
 /** Validate pasted CV text. Synchronous, because nothing needs fetching. */
 export function extractFromPaste(raw: string): CvInput {
   const text = normaliseText(raw);
+  const m = clientMessages().extract;
+  const tag = getRuntimeLocale();
 
   if (text.replace(/\s/g, "").length < LIMITS.cvMinChars) {
     throw new ExtractionError(
       "too-short",
-      "That's too short to read as a CV. Paste the whole thing, including your experience and skills.",
+      m.cvTooShort,
     );
   }
 
   if (text.length > LIMITS.cvChars) {
     throw new ExtractionError(
       "too-long",
-      `That's ${text.length.toLocaleString("en")} characters. We read up to ${LIMITS.cvChars.toLocaleString("en")} — trim it to the roles that matter for this job.`,
+      fmt(m.cvTooLong, {
+        length: text.length.toLocaleString(tag),
+        limit: LIMITS.cvChars.toLocaleString(tag),
+      }),
     );
   }
 
@@ -203,23 +207,24 @@ type ExtractUrlPayload = {
 };
 
 async function readUrl(url: string): Promise<ExtractUrlPayload> {
+  const m = clientMessages().extract;
   let response: Response;
   try {
     response = await fetch("/api/extract-url", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-callback-locale": getRuntimeLocale() },
       body: JSON.stringify({ url }),
     });
   } catch {
     throw new ExtractionError(
       "offline",
-      "We couldn't reach the server. Check your connection and try again.",
+      m.offline,
       { suggestPaste: true },
     );
   }
 
   if (!response.ok) {
-    let message = "We couldn't read this link.";
+    let message = m.linkFailed;
     try {
       const error = (await response.json()) as ApiError;
       if (error?.error) message = error.error;
@@ -243,7 +248,7 @@ export async function extractFromLink(url: string): Promise<CvInput> {
   if (text.replace(/\s/g, "").length < LIMITS.cvMinChars) {
     throw new ExtractionError(
       "link-failed",
-      "We read that page but found very little text. Paste your CV instead.",
+      clientMessages().extract.linkSparse,
       { suggestPaste: true },
     );
   }
@@ -265,7 +270,7 @@ export async function fetchJobFromUrl(url: string): Promise<JobInput> {
   if (text.replace(/\s/g, "").length < LIMITS.jobMinChars) {
     throw new ExtractionError(
       "link-failed",
-      "That page didn't have a full job description on it. Paste the text instead.",
+      clientMessages().extract.jobSparse,
       { suggestPaste: true },
     );
   }
@@ -286,18 +291,20 @@ export function jobFromPaste(raw: string, extras?: {
   company?: string;
 }): JobInput {
   const text = normaliseText(raw);
+  const m = clientMessages().extract;
+  const tag = getRuntimeLocale();
 
   if (text.replace(/\s/g, "").length < LIMITS.jobMinChars) {
-    throw new ExtractionError(
-      "too-short",
-      "This doesn't look like a full job description. Paste the whole posting, including the requirements.",
-    );
+    throw new ExtractionError("too-short", m.jobTooShort);
   }
 
   if (text.length > LIMITS.jobChars) {
     throw new ExtractionError(
       "too-long",
-      `That's ${text.length.toLocaleString("en")} characters. We read up to ${LIMITS.jobChars.toLocaleString("en")} — paste just the role and requirements.`,
+      fmt(m.jobTooLong, {
+        length: text.length.toLocaleString(tag),
+        limit: LIMITS.jobChars.toLocaleString(tag),
+      }),
     );
   }
 

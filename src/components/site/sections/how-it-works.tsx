@@ -5,6 +5,8 @@ import { Check, FileText, Briefcase, Gauge, Sparkles } from "lucide-react";
 import { useActiveBlock } from "@/components/site/use-active-block";
 import { EASE_EDITORIAL, Parallax, Reveal, SplitWords } from "@/components/motion/primitives";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/i18n/client";
+import { fmt } from "@/i18n/config";
 
 /**
  * Section 6: how it works (PRD section 10).
@@ -15,37 +17,17 @@ import { cn } from "@/lib/utils";
  * A pile of paper CV pages drifts up along the bottom edge as you scroll.
  */
 
-const STEPS = [
-  {
-    number: "01",
-    title: "Add your CV",
-    body: "Upload a PDF or Word file, paste the text, or point us at a public link.",
-  },
-  {
-    number: "02",
-    title: "Add the job",
-    body: "Paste the description, or give us the URL of the career page.",
-  },
-  {
-    number: "03",
-    title: "Get your match",
-    body: "An ATS score, a match percentage, and every requirement checked with evidence.",
-  },
-  {
-    number: "04",
-    title: "Pivot & re-check",
-    body: "Accept the rewrites you agree with, re-check, and watch both scores move.",
-  },
-] as const;
-
-const SYNCED = [
-  { label: "alex-taylor-cv.pdf", status: "read", icon: FileText },
-  { label: "Job: Product Analyst", status: "read", icon: Briefcase },
-  { label: "Match report", status: "ready", icon: Gauge },
-  { label: "Improved CV", status: "re-checked", icon: Sparkles },
-] as const;
-
 export function HowItWorks() {
+  const hw = useI18n().t.site.how;
+  const STEPS = hw.steps.map((step, index) => ({ ...step, number: `0${index + 1}` }));
+  const y = hw.synced;
+  const SYNCED = [
+    { label: "alex-taylor-cv.pdf", status: y.read, icon: FileText },
+    { label: y.job, status: y.read, icon: Briefcase },
+    { label: y.report, status: y.ready, icon: Gauge },
+    { label: y.improved, status: y.rechecked, icon: Sparkles },
+  ];
+
   const { active, register, setActive } = useActiveBlock(STEPS.length);
 
   return (
@@ -64,10 +46,10 @@ export function HowItWorks() {
           <div className="relative grid gap-14 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
             {/* ---------- Left: the steps ---------- */}
             <div>
-              <p className="eyebrow eyebrow-on-dark mb-4">How it works</p>
+              <p className="eyebrow eyebrow-on-dark mb-4">{hw.eyebrow}</p>
               <SplitWords
-                text="What if every application got a callback?"
-                accent={["callback?"]}
+                text={hw.title}
+                accent={[hw.titleAccent]}
                 className="display-2 max-w-[20ch] font-serif text-white"
               />
 
@@ -179,7 +161,7 @@ export function HowItWorks() {
                           )}
                         </AnimatePresence>
                         <span className="hidden text-[11.5px] text-muted sm:inline">
-                          {done ? `${item.status} · just now` : "waiting"}
+                          {done ? fmt(y.justNow, { status: item.status }) : y.waiting}
                         </span>
                       </span>
                     </motion.li>

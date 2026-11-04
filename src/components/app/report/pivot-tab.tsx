@@ -8,6 +8,8 @@ import { Tag } from "@/components/ui/tag";
 import { isApplicable } from "@/lib/analysis/apply";
 import type { Suggestion, SuggestionDecision, SuggestionKind } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/i18n/client";
+import { fmt } from "@/i18n/config";
 
 /**
  * The "What to pivot" tab (PRD section 2 step 4).
@@ -22,15 +24,6 @@ import { cn } from "@/lib/utils";
  *    in words, and accepting it never writes anything into the CV — the user
  *    decides whether it is true of them.
  */
-
-const KIND_META: Record<SuggestionKind, { label: string; blurb: string }> = {
-  rewrite: { label: "Rewrite", blurb: "Same facts, the job's language" },
-  summary: { label: "New summary", blurb: "Tailored to this role" },
-  keywords: { label: "Add only if true", blurb: "Your call, not ours" },
-  moveup: { label: "Move up", blurb: "Lead with what fits" },
-  cut: { label: "Cut or shorten", blurb: "Make room for what matters" },
-  gap: { label: "Gap to address", blurb: "Something to go and do" },
-};
 
 const KIND_ORDER: SuggestionKind[] = [
   "rewrite",
@@ -87,6 +80,8 @@ export function PivotTab({
   problem?: string | null;
 }) {
   const [copied, setCopied] = useState<string | null>(null);
+  const p = useI18n().t.report.pivot;
+  const KIND_META: Record<SuggestionKind, { label: string; blurb: string }> = p.kinds;
 
   const copy = async (id: string, text: string) => {
     try {
@@ -101,10 +96,9 @@ export function PivotTab({
   if (suggestions.length === 0) {
     return (
       <Card surface="sand" className="text-center">
-        <p className="font-serif text-[18px] text-ink">No suggestions yet</p>
+        <p className="font-serif text-[18px] text-ink">{p.emptyTitle}</p>
         <p className="mx-auto mt-2 max-w-[42ch] text-[12.5px] leading-relaxed text-muted">
-          {problem ??
-            "We didn't generate any suggestions for this report. Your ATS check and job match are still complete."}
+          {problem ?? p.emptyBody}
         </p>
       </Card>
     );
@@ -124,14 +118,13 @@ export function PivotTab({
       <Card>
         <div className="flex flex-wrap items-baseline justify-between gap-3">
           <div>
-            <Eyebrow className="mb-2">What to pivot</Eyebrow>
+            <Eyebrow className="mb-2">{p.eyebrow}</Eyebrow>
             <p className="text-[13px] leading-relaxed text-muted">
-              Accept the changes you agree with, then re-check. Nothing is
-              invented — every rewrite uses facts already in your CV.
+              {p.lede}
             </p>
           </div>
           <p className="shrink-0 text-[12.5px] tabular-nums text-muted">
-            {accepted} of {suggestions.length} accepted
+            {fmt(p.acceptedCount, { accepted, total: suggestions.length })}
           </p>
         </div>
       </Card>
@@ -166,7 +159,7 @@ export function PivotTab({
                       {isAccepted ? (
                         <Tag tone="mint" className="shrink-0">
                           <span aria-hidden="true">✓</span>
-                          Accepted
+                          {p.accepted}
                         </Tag>
                       ) : null}
                     </div>
@@ -178,7 +171,7 @@ export function PivotTab({
                       <div className="rounded-[4px] border border-line">
                         <div className="border-b border-line bg-coral/20 px-3 py-2.5">
                           <p className="mb-1 text-[10.5px] font-medium uppercase tracking-[0.1em] text-coral-ink">
-                            Before
+                            {p.before}
                           </p>
                           <p className="text-[12.5px] leading-relaxed text-ink line-through decoration-coral-ink/50">
                             {suggestion.before}
@@ -188,7 +181,7 @@ export function PivotTab({
                         {suggestion.after ? (
                           <div className="bg-mint/25 px-3 py-2.5">
                             <p className="mb-1 text-[10.5px] font-medium uppercase tracking-[0.1em] text-mint-ink">
-                              After
+                              {p.after}
                             </p>
                             <p className="text-[12.5px] leading-relaxed text-ink">
                               {highlightKeywords(suggestion.after, suggestion.keywords)}
@@ -197,9 +190,7 @@ export function PivotTab({
                         ) : (
                           <div className="bg-sand px-3 py-2.5">
                             <p className="text-[12px] italic leading-relaxed text-muted">
-                              {suggestion.kind === "cut"
-                                ? "Remove this line."
-                                : "Move this higher up your CV."}
+                              {suggestion.kind === "cut" ? p.remove : p.moveHigher}
                             </p>
                           </div>
                         )}
@@ -207,7 +198,7 @@ export function PivotTab({
                     ) : suggestion.after ? (
                       <div className="rounded-[4px] bg-mint/25 px-3 py-2.5">
                         <p className="mb-1 text-[10.5px] font-medium uppercase tracking-[0.1em] text-mint-ink">
-                          Suggested
+                          {p.suggested}
                         </p>
                         <p className="text-[12.5px] leading-relaxed text-ink">
                           {highlightKeywords(suggestion.after, suggestion.keywords)}
@@ -226,9 +217,7 @@ export function PivotTab({
                           ))}
                         </ul>
                         <p className="mt-2.5 text-[11.5px] leading-relaxed text-muted">
-                          Your CV doesn&apos;t currently support these, so we
-                          won&apos;t write them in for you. Add the ones that are
-                          genuinely true of you, with a real example.
+                          {p.keywordsNote}
                         </p>
                       </div>
                     ) : null}
@@ -248,7 +237,7 @@ export function PivotTab({
                           onClick={() => onDecide(suggestion.id, "pending")}
                         >
                           <Undo2 className="size-3.5" aria-hidden="true" />
-                          Undo
+                          {p.undo}
                         </Button>
                       ) : (
                         <Button
@@ -256,7 +245,7 @@ export function PivotTab({
                           onClick={() => onDecide(suggestion.id, "accepted")}
                         >
                           <Check className="size-3.5" aria-hidden="true" />
-                          Accept
+                          {p.accept}
                         </Button>
                       )}
 
@@ -266,7 +255,7 @@ export function PivotTab({
                         onClick={() => void copy(suggestion.id, copyText)}
                       >
                         <Copy className="size-3.5" aria-hidden="true" />
-                        {copied === suggestion.id ? "Copied" : "Copy"}
+                        {copied === suggestion.id ? p.copied : p.copy}
                       </Button>
 
                       {!dismissed ? (
@@ -276,7 +265,7 @@ export function PivotTab({
                           onClick={() => onDecide(suggestion.id, "dismissed")}
                         >
                           <X className="size-3.5" aria-hidden="true" />
-                          Dismiss
+                          {p.dismiss}
                         </Button>
                       ) : (
                         <Button
@@ -285,13 +274,13 @@ export function PivotTab({
                           onClick={() => onDecide(suggestion.id, "pending")}
                         >
                           <Undo2 className="size-3.5" aria-hidden="true" />
-                          Bring back
+                          {p.bringBack}
                         </Button>
                       )}
 
                       {!isApplicable(suggestion) ? (
                         <span className="ml-auto text-[11px] text-muted">
-                          Advice only — not added to your CV
+                          {p.adviceOnly}
                         </span>
                       ) : null}
                     </div>

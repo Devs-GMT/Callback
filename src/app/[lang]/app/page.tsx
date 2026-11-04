@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { Loader2 } from "lucide-react";
 import { AppFlow } from "@/components/app/app-flow";
+import { getI18n } from "@/i18n/server";
 
 /**
  * The app route.
@@ -11,7 +12,8 @@ import { AppFlow } from "@/components/app/app-flow";
  * plain — it is visible for a moment at most, and anything more elaborate
  * would flash against the real layout underneath it.
  */
-export default function AppPage() {
+export default async function AppPage() {
+  const { t } = await getI18n();
   return (
     <Suspense
       fallback={
@@ -20,7 +22,7 @@ export default function AppPage() {
             className="size-5 animate-spin text-muted motion-reduce:animate-none"
             aria-hidden="true"
           />
-          <span className="sr-only">Loading</span>
+          <span className="sr-only">{t.app.flow.loading}</span>
         </div>
       }
     >

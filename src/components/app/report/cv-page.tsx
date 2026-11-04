@@ -16,6 +16,8 @@ import {
   type ResolvedCvStyle,
 } from "@/lib/cv-templates";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/i18n/client";
+import { fmt } from "@/i18n/config";
 
 /**
  * The CV as a page, drawn from the same template numbers as the PDF.
@@ -53,10 +55,10 @@ const FAMILY: Record<FontFamily, string> = {
 };
 
 /** Mint wash on lines a suggestion changed, with the original on hover. */
-function changedProps(line?: Pick<CvLine, "changed" | "replaced">) {
+function changedProps(line: Pick<CvLine, "changed" | "replaced"> | undefined, was: string) {
   return {
     className: cn(line?.changed && "rounded-[2px] bg-mint/55 box-decoration-clone"),
-    title: line?.replaced ? `Was: ${line.replaced.trim()}` : undefined,
+    title: line?.replaced ? fmt(was, { value: line.replaced.trim() }) : undefined,
   };
 }
 
@@ -103,6 +105,8 @@ export function CvHeader({
   headline?: CvLine;
   lines: CvLine[];
 }) {
+  const { t } = useI18n();
+  const was = t.report.improved.was;
   const align = s.header === "center" ? "center" : "left";
   return (
     <header
@@ -130,7 +134,7 @@ export function CvHeader({
             marginBottom: pt(s.size.name * 0.28),
           }}
         >
-          <span {...changedProps(name)}>{stripInline(name.text)}</span>
+          <span {...changedProps(name, was)}>{stripInline(name.text)}</span>
         </h2>
       ) : null}
       {headline ? (
@@ -143,12 +147,12 @@ export function CvHeader({
             marginBottom: pt(3),
           }}
         >
-          <span {...changedProps(headline)}><Inline text={headline.text} /></span>
+          <span {...changedProps(headline, was)}><Inline text={headline.text} /></span>
         </p>
       ) : null}
       {lines.map((line, index) => (
         <p key={index} style={{ fontSize: pt(s.size.small), color: line.links ? s.accent : CV_MUTED }}>
-          <span {...changedProps(line)}><Inline runs={contactRuns(line.text)} /></span>
+          <span {...changedProps(line, was)}><Inline runs={contactRuns(line.text)} /></span>
         </p>
       ))}
     </header>
@@ -184,6 +188,8 @@ export function CvHeading({ s, text }: { s: ResolvedCvStyle; text: string }) {
 
 /** A section's lines, with consecutive bullets grouped into one real list. */
 export function CvLines({ s, lines }: { s: ResolvedCvStyle; lines: CvLine[] }) {
+  const { t } = useI18n();
+  const was = t.report.improved.was;
   const blocks: Array<CvLine | CvLine[]> = [];
   for (const line of lines) {
     const last = blocks[blocks.length - 1];
@@ -204,7 +210,7 @@ export function CvLines({ s, lines }: { s: ResolvedCvStyle; lines: CvLine[] }) {
                   className="list-disc marker:text-[#1a1a1a]"
                   style={{ marginTop: i === 0 ? 0 : pt(s.space.item) }}
                 >
-                  <span {...changedProps(line)}><Inline text={line.text} /></span>
+                  <span {...changedProps(line, was)}><Inline text={line.text} /></span>
                 </li>
               ))}
             </ul>
@@ -219,13 +225,13 @@ export function CvLines({ s, lines }: { s: ResolvedCvStyle; lines: CvLine[] }) {
         if (block.kind === "subtitle") {
           return (
             <p key={index} style={{ fontStyle: "italic", color: CV_MUTED }}>
-              <span {...changedProps(block)}><Inline text={block.text} /></span>
+              <span {...changedProps(block, was)}><Inline text={block.text} /></span>
             </p>
           );
         }
         return (
           <p key={index} style={{ marginTop: top ?? pt(s.space.item) }}>
-            <span {...changedProps(block)}><Inline text={block.text} /></span>
+            <span {...changedProps(block, was)}><Inline text={block.text} /></span>
           </p>
         );
       })}
@@ -234,6 +240,8 @@ export function CvLines({ s, lines }: { s: ResolvedCvStyle; lines: CvLine[] }) {
 }
 
 function CvEntry({ s, line, first }: { s: ResolvedCvStyle; line: CvLine; first: boolean }) {
+  const { t } = useI18n();
+  const was = t.report.improved.was;
   const parts = line.parts;
   return (
     <div
@@ -241,7 +249,7 @@ function CvEntry({ s, line, first }: { s: ResolvedCvStyle; line: CvLine; first: 
       style={{ marginTop: first ? 0 : pt(s.space.entry), columnGap: pt(12) }}
     >
       <p className="min-w-0">
-        <span {...changedProps(line)}>
+        <span {...changedProps(line, was)}>
           <span style={{ fontWeight: 600 }}><Inline text={parts ? parts.title : line.text} /></span>
           {parts?.org ? <span>{orgPrefix(parts)}<Inline text={parts.org} /></span> : null}
         </span>

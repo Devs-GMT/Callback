@@ -5,6 +5,8 @@ import { useActiveBlock } from "@/components/site/use-active-block";
 import { TornPaper, TornPhoto } from "@/components/site/torn-photo";
 import { EASE_EDITORIAL, Reveal, SplitWords } from "@/components/motion/primitives";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/i18n/client";
+
 import portraitPhoto from "../../../../public/images/portrait-trust.jpg";
 
 /**
@@ -20,34 +22,9 @@ import portraitPhoto from "../../../../public/images/portrait-trust.jpg";
  * that hides content from assistive technology is not a trust signal.
  */
 
-const PILLARS = [
-  {
-    heading: "Reads any format",
-    body:
-      "PDF and Word files are parsed in your browser, including two-column layouts — which we flag, because an ATS reads those out of order. Or paste the text, or give us a public link.",
-    card: { label: "Format", text: "2-column layout detected", tone: "yellow" },
-  },
-  {
-    heading: "Explains every score",
-    body:
-      "Seven ATS checks, each with its own points, its own reason and a one-line fix. The match percentage shows its arithmetic: must-haves 60%, nice-to-haves 20%, keywords 20%.",
-    card: { label: "Score", text: "Bullets: 9 of 15 points", tone: "lilac" },
-  },
-  {
-    heading: "Never invents experience",
-    body:
-      "A requirement only counts if we can quote the line in your CV that proves it. Rewrites rephrase facts you already have. Keywords you can't back up go in a list you approve, not into your CV.",
-    card: { label: "Evidence", text: "“Built weekly SQL reports for 4 teams” ✓", tone: "mint" },
-  },
-  {
-    heading: "Private by design",
-    body:
-      "Your CV is sent for the AI check and nothing else — never stored, never logged. Reports stay in your browser. Stamping puts two salted hashes on-chain and no personal data at all.",
-    card: { label: "On-chain", text: "0x7f3a…c21e · no personal data", tone: "stone" },
-  },
-] as const;
+const TONES = ["yellow", "lilac", "mint", "stone"] as const;
 
-const TONE: Record<(typeof PILLARS)[number]["card"]["tone"], string> = {
+const TONE: Record<(typeof TONES)[number], string> = {
   yellow: "bg-yellow text-yellow-ink",
   lilac: "bg-lilac-soft text-[#5b3d99]",
   mint: "bg-mint text-mint-ink",
@@ -55,6 +32,12 @@ const TONE: Record<(typeof PILLARS)[number]["card"]["tone"], string> = {
 };
 
 export function Trusted() {
+  const tr = useI18n().t.site.trusted;
+  const PILLARS = tr.pillars.map((pillar, index) => ({
+    heading: pillar.heading,
+    body: pillar.body,
+    card: { label: pillar.cardLabel, text: pillar.cardText, tone: TONES[index] },
+  }));
   const { active, register, setActive } = useActiveBlock(PILLARS.length);
   const current = PILLARS[active];
 
@@ -65,11 +48,11 @@ export function Trusted() {
     <section id="who" className="section-light relative overflow-x-clip py-20 md:py-32">
       <div className="shell">
         <Reveal>
-          <p className="eyebrow mb-4">Built to be trusted</p>
+          <p className="eyebrow mb-4">{tr.eyebrow}</p>
         </Reveal>
         <SplitWords
-          text="Guidance you can check, not a black box."
-          accent={["check,"]}
+          text={tr.title}
+          accent={[tr.titleAccent]}
           accentClassName="italic text-[#8a63d2]"
           className="display-2 max-w-[22ch] font-serif text-ink"
         />
@@ -133,7 +116,7 @@ export function Trusted() {
             <TornPhoto
               id="trusted-photo"
               src={portraitPhoto}
-              alt="A smiling man, in black and white, illustrating a job seeker"
+              alt={tr.photoAlt}
               seed={5}
               className="relative aspect-[4/5] w-full rotate-[2deg]"
               imageClassName="photo-mono object-[66%_40%]"

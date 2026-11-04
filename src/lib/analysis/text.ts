@@ -62,15 +62,21 @@ export function extractHeadingLines(text: string): string[] {
 
 export type SectionKey = "experience" | "education" | "skills" | "summary";
 
+/*
+ * Headings in English, Indonesian and Malay. The two Malay-family languages
+ * share most of their CV vocabulary ("pengalaman", "pendidikan"), so they are
+ * matched together; where they differ (Indonesian "keterampilan", Malay
+ * "kemahiran"; Indonesian "riwayat", Malay "sejarah") both are listed.
+ */
 const SECTION_PATTERNS: Record<SectionKey, RegExp> = {
   experience:
-    /\b(work\s+experience|professional\s+experience|experience|employment(\s+history)?|work\s+history|career\s+history|relevant\s+experience|pengalaman(\s+kerja)?|riwayat\s+pekerjaan)\b/i,
+    /\b(work\s+experience|professional\s+experience|experience|employment(\s+history)?|work\s+history|career\s+history|relevant\s+experience|pengalaman(\s+(kerja|bekerja|pekerjaan|profesional|organisasi))?|riwayat\s+(pekerjaan|kerja)|sejarah\s+(pekerjaan|kerjaya))\b/i,
   education:
-    /\b(education|academic(\s+background)?|qualifications|educational\s+background|pendidikan|riwayat\s+pendidikan)\b/i,
+    /\b(education|academic(\s+background)?|qualifications|educational\s+background|pendidikan(\s+formal)?|riwayat\s+pendidikan|latar\s+belakang\s+pendidikan|kelayakan(\s+akademik)?|akademik)\b/i,
   skills:
-    /\b(skills|technical\s+skills|core\s+competenc(?:y|ies)|competencies|technologies|tech\s+stack|key\s+skills|keahlian|keterampilan|kemampuan)\b/i,
+    /\b(skills|technical\s+skills|core\s+competenc(?:y|ies)|competencies|technologies|tech\s+stack|key\s+skills|keahlian|keterampilan|kemampuan|kompetensi|kemahiran(\s+teknikal)?)\b/i,
   summary:
-    /\b(summary|professional\s+summary|profile|about\s+me|objective|career\s+objective|personal\s+statement|ringkasan|profil|tentang\s+saya)\b/i,
+    /\b(summary|professional\s+summary|profile|about\s+me|objective|career\s+objective|personal\s+statement|ringkasan(\s+profesional)?|profil(\s+(singkat|diri|profesional))?|tentang\s+saya|objektif(\s+kerjaya)?|tujuan\s+karier)\b/i,
 };
 
 /**
@@ -118,7 +124,7 @@ export type ContactFindings = {
  * not need to be exhaustive to be useful.
  */
 const LOCATION_HINT =
-  /\b(location|based\s+in|address|city|remote|hybrid|on-?site)\b|\b(jakarta|bandung|surabaya|singapore|kuala\s+lumpur|london|manchester|berlin|munich|amsterdam|paris|madrid|barcelona|dublin|lisbon|warsaw|prague|stockholm|copenhagen|oslo|helsinki|zurich|vienna|new\s+york|san\s+francisco|seattle|austin|boston|chicago|toronto|vancouver|sydney|melbourne|auckland|tokyo|seoul|bangkok|manila|hanoi|ho\s+chi\s+minh|dubai|bengaluru|bangalore|mumbai|delhi|hyderabad|karachi|lahore|lagos|nairobi|cairo|cape\s+town|johannesburg|sao\s+paulo|são\s+paulo|buenos\s+aires|mexico\s+city|bogota|bogotá|santiago|lima)\b/i;
+  /\b(location|based\s+in|address|city|remote|hybrid|on-?site|alamat|lokasi|domisili|kota|bandar|negeri|jarak\s+jauh)\b|\b(jakarta|bandung|surabaya|yogyakarta|semarang|medan|makassar|denpasar|bali|bekasi|tangerang|depok|bogor|malang|palembang|balikpapan|batam|penang|george\s+town|johor\s+bahru|petaling\s+jaya|shah\s+alam|ipoh|kota\s+kinabalu|kuching|cyberjaya|putrajaya|selangor|melaka|singapore|kuala\s+lumpur|london|manchester|berlin|munich|amsterdam|paris|madrid|barcelona|dublin|lisbon|warsaw|prague|stockholm|copenhagen|oslo|helsinki|zurich|vienna|new\s+york|san\s+francisco|seattle|austin|boston|chicago|toronto|vancouver|sydney|melbourne|auckland|tokyo|seoul|bangkok|manila|hanoi|ho\s+chi\s+minh|dubai|bengaluru|bangalore|mumbai|delhi|hyderabad|karachi|lahore|lagos|nairobi|cairo|cape\s+town|johannesburg|sao\s+paulo|são\s+paulo|buenos\s+aires|mexico\s+city|bogota|bogotá|santiago|lima)\b/i;
 
 export function detectContact(text: string): ContactFindings {
   return {
@@ -144,8 +150,13 @@ export type DateFormat =
   | "year-only"
   | "season-year";
 
+/*
+ * English, Indonesian and Malay month names and their usual abbreviations.
+ * Longer spellings come first inside each alternation so "Januari" is not
+ * consumed as "Jan" with a dangling "uari".
+ */
 const MONTH =
-  "jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?";
+  "jan(?:uary|uari)?|feb(?:ruary|ruari)?|mar(?:ch|et)?|mac|apr(?:il)?|may|mei|jun(?:e|i)?|jul(?:y|i|ai)?|aug(?:ust)?|agu(?:stus)?|agt|ags|ogo(?:s)?|sep(?:t|tember)?|oct(?:ober)?|okt(?:ober)?|nov(?:ember)?|dec(?:ember)?|des(?:ember)?|dis(?:ember)?";
 
 const DATE_PATTERNS: Array<{ format: DateFormat; pattern: RegExp }> = [
   { format: "month-year", pattern: new RegExp(`\\b(?:${MONTH})\\.?\\s+\\d{4}\\b`, "gi") },
@@ -202,9 +213,10 @@ export function detectDates(text: string): DateFindings {
     total,
     dominant,
     dominantShare: total === 0 ? 0 : best / total,
-    hasRanges: /\d{4}\s*(?:-|–|—|to|until|through)\s*(?:\d{4}|present|current|now)/i.test(
-      text,
-    ),
+    hasRanges:
+      /\d{4}\s*(?:-|–|—|to|until|through|hingga|sampai|sehingga|s\.?\/?d\.?)\s*(?:\d{4}|present|current|now|sekarang|saat\s+ini|kini|masa\s+kini|semasa)/i.test(
+        text,
+      ),
   };
 }
 
@@ -250,17 +262,58 @@ export const ACTION_VERBS = [
   "wrote",
 ] as const;
 
-const ACTION_VERB_SET = new Set<string>(ACTION_VERBS);
+/**
+ * Indonesian and Malay openers. Both languages build verbs with prefixes
+ * (me-, mem-, men-, meng-, meny-, ber-), and a CV bullet that starts with an
+ * active "me-" verb is the equivalent of an English past-tense opener. Where
+ * the two languages differ the Malay form is listed too ("mengurangi" /
+ * "mengurangkan", "berhasil" / "berjaya").
+ */
+export const ACTION_VERBS_ID_MS = [
+  "memimpin", "mengetuai", "mengembangkan", "membangun", "membangunkan",
+  "membuat", "menciptakan", "mencipta", "merancang", "mendesain",
+  "meningkatkan", "menaikkan", "menambah", "mengurangi", "mengurangkan",
+  "menurunkan", "menghemat", "menjimatkan", "mempercepat", "mempercepatkan",
+  "mengelola", "mengurus", "menguruskan", "mengoordinasikan", "menyelaraskan",
+  "mengorganisasi", "menganalisis", "menganalisa", "meneliti", "mengevaluasi",
+  "menilai", "mengotomatiskan", "mengautomasikan", "mengimplementasikan",
+  "menerapkan", "melaksanakan", "menjalankan", "meluncurkan", "melancarkan",
+  "merilis", "mencapai", "melampaui", "memenangkan", "memenangi", "melatih",
+  "membimbing", "mementori", "mengajar", "menyusun", "menulis", "menyajikan",
+  "mempresentasikan", "membentangkan", "menegosiasikan", "merundingkan",
+  "memperbaiki", "memperbaharui", "memodernisasi", "mengoptimalkan",
+  "mengoptimumkan", "menyederhanakan", "memudahkan", "mengintegrasikan",
+  "menyepadukan", "memigrasikan", "memindahkan", "menguji", "memvalidasi",
+  "memverifikasi", "merekrut", "mengambil", "menjual", "memasarkan",
+  "mendirikan", "menubuhkan", "menginisiasi", "memulakan", "memprakarsai",
+  "mengawasi", "menyelia", "memantau", "memastikan", "menyelesaikan",
+  "menangani", "mengatasi", "menghasilkan", "memproduksi", "mengumpulkan",
+  "membersihkan", "memodelkan", "memprogram", "mengkonfigurasi",
+  "mengonfigurasi", "mendokumentasikan", "menstandarkan", "menyeragamkan",
+  "berhasil", "berjaya", "berkolaborasi", "bekerjasama", "berkontribusi",
+  "menyumbang",
+] as const;
+
+const ACTION_VERB_SET = new Set<string>([...ACTION_VERBS, ...ACTION_VERBS_ID_MS]);
+
+/** The active "me-" verb shape shared by Indonesian and Malay. */
+const ME_VERB = /^me(?:m|n|ng|ny)?[a-z]{3,}$/;
+
+/** English words that happen to look like a "me-" verb. */
+const NOT_ME_VERB =
+  /^(?:member|members|membership|meeting|meetings|media|medical|medium|memo|memory|menu|mechanic|mechanical|method|methods|metric|metrics|mental|mentor|mentorship|merchant|merchandising|message|messages|messaging|metal|meta|methodology)$/;
 
 /** Weak openers that signal a duty list rather than an achievement. */
 const WEAK_OPENERS =
-  /^(responsible\s+for|duties\s+included|tasked\s+with|involved\s+in|helped\s+(?:with|to)|worked\s+on|assisted\s+(?:with|in)|participated\s+in|in\s+charge\s+of)\b/i;
+  /^(responsible\s+for|duties\s+included|tasked\s+with|involved\s+in|helped\s+(?:with|to)|worked\s+on|assisted\s+(?:with|in)|participated\s+in|in\s+charge\s+of|bertanggung\s*jawab|tanggung\s+jawab|bertugas|ditugaskan|tugas(?:\s+saya)?|terlibat\s+dalam|ikut\s+serta|ikut\s+membantu|membantu|turut\s+serta|mengerjakan|melakukan\s+tugas)\b/i;
 
 export function startsWithActionVerb(bullet: string): boolean {
   const first = bullet.trim().split(/[\s,.;:]+/)[0]?.toLowerCase() ?? "";
+  if (WEAK_OPENERS.test(bullet)) return false;
   if (ACTION_VERB_SET.has(first)) return true;
-  // Accept regular past-tense verbs the list misses, but not weak openers.
-  return /^[a-z]{4,}ed$/.test(first) && !WEAK_OPENERS.test(bullet);
+  // Accept regular English past-tense verbs and Indonesian/Malay "me-" verbs
+  // the lists miss, but never a weak opener.
+  return /^[a-z]{4,}ed$/.test(first) || (ME_VERB.test(first) && !NOT_ME_VERB.test(first));
 }
 
 export function hasWeakOpener(bullet: string): boolean {
@@ -269,7 +322,7 @@ export function hasWeakOpener(bullet: string): boolean {
 
 /** A number, percentage, money amount or multiple that quantifies a result. */
 export function hasQuantifiedResult(bullet: string): boolean {
-  return /(\d+\s*%|\b\d+(?:[.,]\d+)?\s*(?:k|m|bn|b)\b|[$€£¥]\s?\d|\b\d+(?:[.,]\d{3})+\b|\b\d+\s*(?:x|times|users|customers|clients|teams|people|hours|days|weeks|months|projects|tickets|requests|queries|reports|dashboards|markets|countries|stores|accounts|leads|deals|articles|features|releases|bugs|tests|models|datasets|records|rows|apis|endpoints|services)\b|\b\d{2,}\b)/i.test(
+  return /(\d+\s*%|\b\d+(?:[.,]\d+)?\s*(?:k|m|bn|b|rb|ribu|jt|juta|m(?:iliar|ilyar)|bilion|billion)\b|[$€£¥]\s?\d|\b(?:rp|rm|idr|myr)\.?\s?\d|\b\d+\s*persen\b|\b\d+\s*(?:orang|pengguna|pelanggan|klien|tim|pasukan|proyek|projek|jam|hari|minggu|bulan|toko|kedai|cabang|cawangan|laporan|dasbor|akaun|akun)\b|\b\d+(?:[.,]\d{3})+\b|\b\d+\s*(?:x|times|users|customers|clients|teams|people|hours|days|weeks|months|projects|tickets|requests|queries|reports|dashboards|markets|countries|stores|accounts|leads|deals|articles|features|releases|bugs|tests|models|datasets|records|rows|apis|endpoints|services)\b|\b\d{2,}\b)/i.test(
     bullet,
   );
 }
@@ -325,14 +378,14 @@ export function seniorityGap(a: Seniority, b: Seniority): number {
 
 export function guessSeniority(text: string): Seniority {
   const t = text.toLowerCase();
-  if (/\b(head\s+of|director|vp\b|vice\s+president|principal|staff\s+engineer|lead\b|team\s+lead|tech\s+lead|chief)\b/.test(t))
+  if (/\b(head\s+of|director|vp\b|vice\s+president|principal|staff\s+engineer|lead\b|team\s+lead|tech\s+lead|chief|kepala|direktur|pengarah|ketua\s+(tim|pasukan))\b/.test(t))
     return "lead";
-  if (/\b(senior|sr\.?|snr\b)\b/.test(t)) return "senior";
-  if (/\b(intern|internship|trainee|apprentice|placement\s+student)\b/.test(t))
+  if (/\b(senior|sr\.?|snr\b|kanan)\b/.test(t)) return "senior";
+  if (/\b(intern|internship|trainee|apprentice|placement\s+student|magang|pemagangan|pelatih(\s+industri)?|latihan\s+industri|praktikal)\b/.test(t))
     return "intern";
-  if (/\b(junior|jr\.?|graduate|entry[-\s]level|associate|fresh\s+graduate)\b/.test(t))
+  if (/\b(junior|jr\.?|graduate|entry[-\s]level|associate|fresh\s+graduate|fresh\s+grad|lulusan\s+baru|graduan|siswazah)\b/.test(t))
     return "junior";
-  if (/\b(mid[-\s]level|intermediate|\d\+?\s*years?\s+of\s+experience)\b/.test(t))
+  if (/\b(mid[-\s]level|intermediate|\d\+?\s*years?\s+of\s+experience|(minimal|minimum|sekurang-kurangnya)\s+\d+\s+tahun|\d+\+?\s*tahun\s+pengalaman|pengalaman\s+\d+\+?\s*tahun)\b/.test(t))
     return "mid";
   return "unknown";
 }

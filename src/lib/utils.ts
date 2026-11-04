@@ -1,5 +1,7 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import type { Locale } from "@/i18n/config";
+import { getRuntimeLocale } from "@/i18n/lib";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -15,15 +17,26 @@ export function formatCount(n: number) {
   return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
-/** `Oct 31, 2026` */
-export function formatDate(iso: string | number | Date) {
+const MONTHS: Record<Locale, string[]> = {
+  en: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+  id: ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"],
+  ms: ["Jan", "Feb", "Mac", "Apr", "Mei", "Jun", "Jul", "Ogo", "Sep", "Okt", "Nov", "Dis"],
+};
+
+/**
+ * `Oct 31, 2026` in English, `31 Okt 2026` in Indonesian and Malay.
+ *
+ * Hand-rolled rather than `Intl`, so the server and the browser can never
+ * disagree on the output and break hydration. Components pass their locale;
+ * client-side helpers fall back to the page's.
+ */
+export function formatDate(iso: string | number | Date, locale: Locale = getRuntimeLocale()) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  const months = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-  ];
-  return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+  const month = MONTHS[locale][d.getMonth()];
+  return locale === "en"
+    ? `${month} ${d.getDate()}, ${d.getFullYear()}`
+    : `${d.getDate()} ${month} ${d.getFullYear()}`;
 }
 
 /** `0x12ab…9f3c` — the footer's truncated address form (PRD §13). */

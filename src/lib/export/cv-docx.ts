@@ -29,6 +29,7 @@ import {
   type FontFamily,
   type ResolvedCvStyle,
 } from "@/lib/cv-templates";
+import { clientMessages } from "@/i18n/lib";
 
 export type CvDocxOptions = {
   /** Used for the document title when the CV has no name line. */
@@ -299,7 +300,7 @@ export async function buildCvDocx(
   }
 
   const title = layout.name ? `${stripInline(layout.name.text)} — CV` : (options.title ?? "CV");
-  const document = docxDocument(docx, s, title, "Improved CV exported from Callback", children);
+  const document = docxDocument(docx, s, title, clientMessages().exports.cvSubject, children);
   return docx.Packer.toBlob(document);
 }
 

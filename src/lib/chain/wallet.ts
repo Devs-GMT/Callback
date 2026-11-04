@@ -19,6 +19,10 @@ import {
 } from "ethers";
 import { CALLBACK_ABI, CONTRACT_ERROR_MESSAGES, type OnChainReport } from "@/lib/chain/abi";
 import { ACTIVE_CHAIN, CONTRACT_ADDRESS, IS_CONTRACT_DEPLOYED } from "@/lib/config";
+import { fmt } from "@/i18n/config";
+import { clientMessages } from "@/i18n/lib";
+
+const w = () => clientMessages().wallet;
 
 type InjectedProvider = Eip1193Provider & {
   isMetaMask?: boolean;
@@ -80,10 +84,10 @@ function contractErrorName(error: unknown): string | null {
 function toWalletError(error: unknown, fallback: string): WalletError {
   if (error instanceof WalletError) return error;
   if (isUserRejection(error)) {
-    return new WalletError("rejected", "You cancelled the transaction in your wallet.");
+    return new WalletError("rejected", w().cancelled);
   }
   const name = contractErrorName(error);
-  if (name) return new WalletError("contract", CONTRACT_ERROR_MESSAGES[name] ?? fallback);
+  if (name) return new WalletError("contract", w().contract[name] ?? CONTRACT_ERROR_MESSAGES[name] ?? fallback);
   return new WalletError("failed", fallback);
 }
 
@@ -135,7 +139,7 @@ export async function requestAccounts(): Promise<string[]> {
   if (!provider) {
     throw new WalletError(
       "no-wallet",
-      "MetaMask isn't installed. Everything else works — you only need a wallet to stamp a report.",
+      w().noWalletLong,
     );
   }
   try {
@@ -143,11 +147,11 @@ export async function requestAccounts(): Promise<string[]> {
       method: "eth_requestAccounts",
     })) as string[];
     if (accounts.length === 0) {
-      throw new WalletError("rejected", "No account was shared.");
+      throw new WalletError("rejected", w().noAccount);
     }
     return accounts;
   } catch (error) {
-    throw toWalletError(error, "We couldn't connect to your wallet.");
+    throw toWalletError(error, w().connectFailed);
   }
 }
 
@@ -172,7 +176,7 @@ export async function getChainId(): Promise<number | null> {
 export async function switchToActiveChain(): Promise<void> {
   const provider = getInjectedProvider();
   if (!provider) {
-    throw new WalletError("no-wallet", "MetaMask isn't installed.");
+    throw new WalletError("no-wallet", w().noWallet);
   }
 
   try {
@@ -187,7 +191,7 @@ export async function switchToActiveChain(): Promise<void> {
       ?.originalError?.code;
 
     if (code !== 4902 && nested !== 4902) {
-      throw toWalletError(error, `We couldn't switch to ${ACTIVE_CHAIN.name}.`);
+      throw toWalletError(error, fmt(w().switchFailed, { chain: ACTIVE_CHAIN.name }));
     }
   }
 
@@ -205,7 +209,7 @@ export async function switchToActiveChain(): Promise<void> {
       ],
     });
   } catch (error) {
-    throw toWalletError(error, `We couldn't add ${ACTIVE_CHAIN.name} to your wallet.`);
+    throw toWalletError(error, fmt(w().addFailed, { chain: ACTIVE_CHAIN.name }));
   }
 }
 
@@ -217,7 +221,7 @@ function requireDeployed(): void {
   if (!IS_CONTRACT_DEPLOYED) {
     throw new WalletError(
       "not-deployed",
-      "The Callback contract isn't deployed yet, so stamping is turned off.",
+      w().notDeployed,
     );
   }
 }
@@ -227,7 +231,7 @@ async function getSignerContract(): Promise<{ contract: Contract; address: strin
 
   const injected = getInjectedProvider();
   if (!injected) {
-    throw new WalletError("no-wallet", "MetaMask isn't installed.");
+    throw new WalletError("no-wallet", w().noWallet);
   }
 
   const provider = new BrowserProvider(injected);
@@ -236,7 +240,7 @@ async function getSignerContract(): Promise<{ contract: Contract; address: strin
   if (Number(network.chainId) !== ACTIVE_CHAIN.chainId) {
     throw new WalletError(
       "wrong-network",
-      `Switch to ${ACTIVE_CHAIN.name} to stamp this report.`,
+      fmt(w().wrongNetwork, { chain: ACTIVE_CHAIN.name }),
     );
   }
 
@@ -299,7 +303,7 @@ export async function stampReport(args: StampArgs): Promise<StampResult> {
 
     const receipt = await tx.wait();
     if (!receipt) {
-      throw new WalletError("failed", "The transaction didn't confirm. Try again.");
+      throw new WalletError("failed", w().notConfirmed);
     }
 
     for (const log of receipt.logs) {
@@ -322,10 +326,10 @@ export async function stampReport(args: StampArgs): Promise<StampResult> {
 
     throw new WalletError(
       "failed",
-      "The transaction went through but we couldn't read the report id.",
+      w().noReportId,
     );
   } catch (error) {
-    throw toWalletError(error, "The transaction failed. Please try again.");
+    throw toWalletError(error, w().txFailed);
   }
 }
 

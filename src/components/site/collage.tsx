@@ -52,6 +52,8 @@ function LilacStrip({ transform }: { transform?: string }) {
 
 export type CollageArtProps = {
   className?: string;
+  /** The accessible name, in the reader's language. */
+  label?: string;
 };
 
 const SVG_BASE = "h-full w-full";
@@ -64,13 +66,13 @@ const round = (value: number) => Math.round(value * 100) / 100;
 /* 1. Magnifier over a CV page — "Get past the ATS"                           */
 /* -------------------------------------------------------------------------- */
 
-export function CollageMagnifier({ className }: CollageArtProps) {
+export function CollageMagnifier({ className, label }: CollageArtProps) {
   return (
     <svg
       viewBox="0 0 200 200"
       className={cn(SVG_BASE, className)}
       role="img"
-      aria-label="A magnifying glass over a CV page"
+      aria-label={label ?? "A magnifying glass over a CV page"}
     >
       <TornDisc fill="#E8E0DA" />
       <LilacStrip transform="translate(18 132) rotate(-8)" />
@@ -111,13 +113,13 @@ export function CollageMagnifier({ className }: CollageArtProps) {
 /* 2. Paper plane with lilac paper — "Send better applications"                */
 /* -------------------------------------------------------------------------- */
 
-export function CollagePaperPlane({ className }: CollageArtProps) {
+export function CollagePaperPlane({ className, label }: CollageArtProps) {
   return (
     <svg
       viewBox="0 0 200 200"
       className={cn(SVG_BASE, className)}
       role="img"
-      aria-label="A paper plane over torn lilac paper"
+      aria-label={label ?? "A paper plane over torn lilac paper"}
     >
       <TornDisc fill="#F6DED5" />
 
@@ -160,13 +162,13 @@ export function CollagePaperPlane({ className }: CollageArtProps) {
 /* 3. Key in a torn circle — "Unlock the right keywords"                      */
 /* -------------------------------------------------------------------------- */
 
-export function CollageKey({ className }: CollageArtProps) {
+export function CollageKey({ className, label }: CollageArtProps) {
   return (
     <svg
       viewBox="0 0 200 200"
       className={cn(SVG_BASE, className)}
       role="img"
-      aria-label="A key inside a torn paper circle"
+      aria-label={label ?? "A key inside a torn paper circle"}
     >
       <TornDisc fill="#E8E0DA" />
       <circle cx="100" cy="100" r="54" fill="#C0A1F7" opacity="0.55" />
@@ -188,13 +190,13 @@ export function CollageKey({ className }: CollageArtProps) {
 /* 4. Retro phone — "Get the callback"                                        */
 /* -------------------------------------------------------------------------- */
 
-export function CollageRetroPhone({ className }: CollageArtProps) {
+export function CollageRetroPhone({ className, label }: CollageArtProps) {
   return (
     <svg
       viewBox="0 0 200 200"
       className={cn(SVG_BASE, className)}
       role="img"
-      aria-label="A ringing retro telephone over torn lilac paper"
+      aria-label={label ?? "A ringing retro telephone over torn lilac paper"}
     >
       <TornDisc fill="#F7E6B0" />
       <LilacStrip transform="translate(14 56) rotate(6)" />
@@ -244,13 +246,13 @@ export function CollageRetroPhone({ className }: CollageArtProps) {
 /* 5. Clock — "Save hours per application"                                    */
 /* -------------------------------------------------------------------------- */
 
-export function CollageClock({ className }: CollageArtProps) {
+export function CollageClock({ className, label }: CollageArtProps) {
   return (
     <svg
       viewBox="0 0 200 200"
       className={cn(SVG_BASE, className)}
       role="img"
-      aria-label="A clock face on torn paper"
+      aria-label={label ?? "A clock face on torn paper"}
     >
       <TornDisc fill="#C6E6D3" />
 
@@ -298,13 +300,13 @@ export function CollageClock({ className }: CollageArtProps) {
 /* 6. Classical bust in a torn circle — the carousel's opening card           */
 /* -------------------------------------------------------------------------- */
 
-export function CollageBust({ className }: CollageArtProps) {
+export function CollageBust({ className, label }: CollageArtProps) {
   return (
     <svg
       viewBox="0 0 200 200"
       className={cn(SVG_BASE, className)}
       role="img"
-      aria-label="A classical bust inside a torn paper circle"
+      aria-label={label ?? "A classical bust inside a torn paper circle"}
     >
       <TornDisc fill="#E8E0DA" />
       <circle cx="100" cy="96" r="56" fill="#C0A1F7" opacity="0.45" />
@@ -338,14 +340,14 @@ export function CollageBust({ className }: CollageArtProps) {
  * detail that makes the frame read as "a CV being worked on" rather than
  * decoration.
  */
-export function HeroArtwork({ className }: CollageArtProps) {
+export function HeroArtwork({ className, label }: CollageArtProps) {
   return (
     <svg
       viewBox="0 0 960 600"
       className={cn("h-full w-full", className)}
       preserveAspectRatio="xMidYMid slice"
       role="img"
-      aria-label="An illustration of someone reviewing their CV at a desk"
+      aria-label={label ?? "An illustration of someone reviewing their CV at a desk"}
     >
       <defs>
         {/* A warm tonal grade, standing in for a photo's light. */}

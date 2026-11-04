@@ -3,6 +3,7 @@
 import { useCallback, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
 import { useSearchParams } from "next/navigation";
+import { Link } from "@/i18n/link";
 import { ArrowLeft, ArrowRight, Check, ShieldCheck } from "lucide-react";
 import { Card, Eyebrow } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import { LIMITS } from "@/lib/config";
 import type { CvInput, JobInput, Report } from "@/lib/types";
 import { EASE_EDITORIAL, Magnetic } from "@/components/motion/primitives";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/i18n/client";
 
 /** Each phase of the flow fades up as it replaces the previous one. */
 function Phase({ children, className }: { children: ReactNode; className?: string }) {
@@ -45,10 +47,11 @@ function Stepper({
   jobDone: boolean;
   mobileStep: MobileStep;
 }) {
+  const f = useI18n().t.app.flow;
   const steps = [
-    { label: "Your CV", short: "CV", done: cvDone },
-    { label: "The job", short: "Job", done: jobDone },
-    { label: "Your report", short: "Report", done: false },
+    { ...f.steps.cv, done: cvDone },
+    { ...f.steps.job, done: jobDone },
+    { ...f.steps.report, done: false },
   ];
   // `mobileStep` only leaves "cv" through the mobile Next button, so on wider
   // screens this is the plain "first unfinished input" rule.
@@ -56,7 +59,7 @@ function Stepper({
     cvDone && jobDone ? 2 : mobileStep === "job" ? 1 : !cvDone ? 0 : 1;
 
   return (
-    <ol className="flex items-center gap-2" aria-label="Progress">
+    <ol className="flex items-center gap-2" aria-label={f.progress}>
       {steps.map((step, index) => (
         <li key={step.label} className="flex items-center gap-2">
           <span
@@ -119,6 +122,7 @@ function Stepper({
 export function AppFlow() {
   const searchParams = useSearchParams();
   const sharedReportId = searchParams.get("report");
+  const f = useI18n().t.app.flow;
 
   const analysis = useAnalysis();
 
@@ -253,7 +257,7 @@ export function AppFlow() {
               analysis.setState({ phase: "idle" });
             }}
           >
-            Start a new check
+            {f.startNew}
           </Button>
         </div>
       </Phase>
@@ -276,13 +280,12 @@ export function AppFlow() {
     <Phase className="mx-auto w-full max-w-[1100px] px-4 py-8 sm:px-6 md:py-12 lg:px-10">
       <header className="mb-9 flex flex-wrap items-end justify-between gap-6">
         <div>
-          <Eyebrow className="mb-3">New check</Eyebrow>
+          <Eyebrow className="mb-3">{f.eyebrow}</Eyebrow>
           <h1 className="font-serif text-[clamp(2rem,1.5rem+2vw,3rem)] leading-[1.05] tracking-[-0.02em] text-ink">
-            Add your CV and <span className="italic text-[#8a63d2]">the job</span>.
+            {f.titleStart} <span className="italic text-[#8a63d2]">{f.titleAccent}</span>.
           </h1>
           <p className="mt-3 max-w-[56ch] text-[14px] leading-relaxed text-muted">
-            You&apos;ll get an ATS score, a job match percentage with evidence from
-            your own CV, and exactly what to change.
+            {f.lede}
           </p>
         </div>
         <Stepper cvDone={cv !== null} jobDone={job !== null} mobileStep={mobileStep} />
@@ -295,12 +298,12 @@ export function AppFlow() {
         <div className="mb-4 flex items-center justify-between gap-3 md:hidden">
           <Button tone="ghost" size="sm" className="-ml-3" onClick={() => goToStep("cv")}>
             <ArrowLeft className="size-4" aria-hidden="true" />
-            Back to your CV
+            {f.backToCv}
           </Button>
           {cv ? (
             <span className="flex min-w-0 items-center gap-1.5 text-[12px] text-mint-ink">
               <Check className="size-3.5 shrink-0" aria-hidden="true" />
-              <span className="truncate">{cv.fileName ?? "CV added"}</span>
+              <span className="truncate">{cv.fileName ?? f.cvAdded}</span>
             </span>
           ) : null}
         </div>
@@ -334,11 +337,11 @@ export function AppFlow() {
             className="w-full"
             onClick={() => goToStep("job")}
           >
-            Next: the job
+            {f.next}
             <ArrowRight className="size-4" aria-hidden="true" />
           </Button>
           {cv === null ? (
-            <p className="text-center text-[12.5px] text-muted">Add your CV to continue.</p>
+            <p className="text-center text-[12.5px] text-muted">{f.addCvToContinue}</p>
           ) : null}
         </div>
       ) : null}
@@ -369,7 +372,7 @@ export function AppFlow() {
                 void analysis.run({ cv, job });
               }}
             >
-              Check my CV
+              {f.check}
               <ArrowRight
                 className="size-4 transition-transform duration-300 group-hover:translate-x-0.5"
                 aria-hidden="true"
@@ -381,10 +384,10 @@ export function AppFlow() {
         {!ready ? (
           <p className="text-[12.5px] text-muted">
             {cv === null && job === null
-              ? "Add your CV and a job to start."
+              ? f.needBoth
               : cv === null
-                ? "Add your CV to start."
-                : "Add the job to start."}
+                ? f.needCv
+                : f.needJob}
           </p>
         ) : null}
       </div>
@@ -404,18 +407,16 @@ export function AppFlow() {
         </span>
         <div>
           <p className="text-[12.5px] font-medium text-ink">
-            Your CV stays yours
+            {f.privacyTitle}
           </p>
           <p className="mt-1 text-[12px] leading-relaxed text-muted">
-            Files are read in your browser. Your CV and the job are sent to our
-            server only for the AI check, and are never stored or logged. Reports
-            are saved in this browser only — you can delete them all from{" "}
-            <a
+            {f.privacyBefore}{" "}
+            <Link
               href="/app/applications"
               className="underline decoration-line underline-offset-2 hover:decoration-ink"
             >
-              My applications
-            </a>
+              {f.privacyLink}
+            </Link>
             .
           </p>
         </div>

@@ -18,6 +18,8 @@ import { topFixes } from "@/lib/analysis/ats";
 import { countApplied } from "@/lib/analysis/apply";
 import { formatDate } from "@/lib/utils";
 import type { CoverLetter, Report, StampInfo, SuggestionDecision } from "@/lib/types";
+import { useI18n } from "@/i18n/client";
+import { fmt } from "@/i18n/config";
 
 /**
  * The report, across its tabs (PRD section 2 step 4, plus the cover letter).
@@ -55,6 +57,8 @@ export function ReportView({
   parentOnChainId?: number;
 }) {
   const tabs = useTabs<ReportTab>("overview");
+  const { locale, t } = useI18n();
+  const v = t.report.view;
 
   const acceptedCount = countApplied(report.suggestions, report.decisions);
   const fixes = topFixes(report.ats, 3);
@@ -91,16 +95,16 @@ export function ReportView({
 
   const tabItems = useMemo(
     () => [
-      { id: "overview" as const, label: "Overview" },
-      { id: "ats" as const, label: "ATS check" },
+      { id: "overview" as const, label: v.tabs.overview },
+      { id: "ats" as const, label: v.tabs.ats },
       {
         id: "match" as const,
-        label: "Job match",
+        label: v.tabs.match,
         badge: hasMatch ? undefined : <Tag tone="yellow">!</Tag>,
       },
       {
         id: "pivot" as const,
-        label: "What to pivot",
+        label: v.tabs.pivot,
         badge:
           report.suggestions.length > 0 ? (
             <span className="text-[11px] tabular-nums text-muted">
@@ -108,10 +112,10 @@ export function ReportView({
             </span>
           ) : undefined,
       },
-      { id: "cv" as const, label: "Improved CV" },
-      { id: "letter" as const, label: "Cover letter" },
+      { id: "cv" as const, label: v.tabs.cv },
+      { id: "letter" as const, label: v.tabs.letter },
     ],
-    [acceptedCount, hasMatch, report.suggestions.length],
+    [acceptedCount, hasMatch, report.suggestions.length, v.tabs],
   );
 
   /* ------------------------------------------------------------------ */
@@ -122,15 +126,15 @@ export function ReportView({
     <div className="flex flex-col gap-4">
       <Card className="flex flex-col gap-5">
         <div className="flex flex-wrap items-center justify-center gap-6">
-          <Gauge value={report.ats.score} label="ATS" size={108} />
+          <Gauge value={report.ats.score} label={v.ats} size={108} />
           {hasMatch ? (
-            <Gauge value={report.match.score} label="Match" unit="%" size={108} />
+            <Gauge value={report.match.score} label={v.match} unit="%" size={108} />
           ) : null}
         </div>
 
         {fixes.length > 0 ? (
           <div className="border-t border-line pt-4">
-            <Eyebrow className="mb-2.5">Top fixes</Eyebrow>
+            <Eyebrow className="mb-2.5">{v.topFixes}</Eyebrow>
             <ul className="flex flex-col gap-2">
               {fixes.map((fix) => (
                 <li key={fix.id} className="flex items-baseline justify-between gap-2">
@@ -159,8 +163,8 @@ export function ReportView({
               onClick={() => tabs.setValue(acceptedCount > 0 ? "cv" : "pivot")}
             >
               {acceptedCount > 0
-                ? `See your improved CV (${acceptedCount})`
-                : `Review ${report.suggestions.length} suggestions`}
+                ? fmt(v.seeImproved, { count: acceptedCount })
+                : fmt(v.review, { count: report.suggestions.length })}
             </Button>
           </div>
         ) : null}
@@ -181,11 +185,11 @@ export function ReportView({
       {/* ---------- Header ---------- */}
       <header className="mb-5">
         <Eyebrow className="mb-2">
-          {report.improvedFromId ? "Re-check" : "Report"} ·{" "}
-          {formatDate(report.createdAt)}
+          {report.improvedFromId ? v.recheck : v.report} ·{" "}
+          {formatDate(report.createdAt, locale)}
         </Eyebrow>
         <h1 className="display-3 font-serif text-ink">
-          {report.jobTitle || "Untitled role"}
+          {report.jobTitle || v.untitled}
         </h1>
         {report.company ? (
           <p className="mt-1 text-[13px] text-muted">{report.company}</p>
@@ -200,7 +204,7 @@ export function ReportView({
           {onRetryMatch ? (
             <Button tone="outline" size="sm" onClick={onRetryMatch}>
               <RefreshCw className="size-3.5" aria-hidden="true" />
-              Retry
+              {v.retry}
             </Button>
           ) : null}
         </Card>
@@ -221,7 +225,7 @@ export function ReportView({
             value={tabs.value}
             onChange={tabs.setValue}
             idBase={tabs.idBase}
-            label="Report sections"
+            label={v.sections}
             className="mb-5"
           />
 
@@ -244,16 +248,15 @@ export function ReportView({
               ) : (
                 <Card surface="sand" className="text-center">
                   <p className="font-serif text-[18px] text-ink">
-                    The job match didn&apos;t run
+                    {v.matchDidntRun}
                   </p>
                   <p className="mx-auto mt-2 max-w-[44ch] text-[12.5px] leading-relaxed text-muted">
-                    {problem ??
-                      "Your ATS check is complete and scored. The job match needs the AI service, which wasn't available."}
+                    {problem ?? v.matchDidntRunBody}
                   </p>
                   {onRetryMatch ? (
                     <Button tone="outline" size="sm" className="mt-4" onClick={onRetryMatch}>
                       <RefreshCw className="size-3.5" aria-hidden="true" />
-                      Try the match again
+                      {v.tryMatchAgain}
                     </Button>
                   ) : null}
                 </Card>
@@ -311,7 +314,7 @@ export function ReportView({
           <dl className="flex items-center gap-4">
             <div className="flex items-baseline gap-1.5">
               <dt className="text-[10.5px] uppercase tracking-[0.1em] text-muted">
-                ATS
+                {v.ats}
               </dt>
               <dd className="font-serif text-[18px] tabular-nums text-ink">
                 {report.ats.score}
@@ -320,7 +323,7 @@ export function ReportView({
             {hasMatch ? (
               <div className="flex items-baseline gap-1.5">
                 <dt className="text-[10.5px] uppercase tracking-[0.1em] text-muted">
-                  Match
+                  {v.match}
                 </dt>
                 <dd className="font-serif text-[18px] tabular-nums text-ink">
                   {report.match.score}%
@@ -341,7 +344,7 @@ export function ReportView({
               className={recheckBusy ? "size-3.5 animate-spin motion-reduce:animate-none" : "size-3.5"}
               aria-hidden="true"
             />
-            {recheckBusy ? "Re-checking" : "Re-check"}
+            {recheckBusy ? v.rechecking : v.recheck}
           </Button>
         </div>
       </div>

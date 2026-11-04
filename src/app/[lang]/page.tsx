@@ -11,14 +11,17 @@ import { Tracker } from "@/components/site/sections/tracker";
 import { Integrations } from "@/components/site/sections/integrations";
 import { Faq } from "@/components/site/sections/faq";
 import { ClosingCta } from "@/components/site/sections/closing-cta";
-import { SITE_URL } from "@/lib/config";
+import { getI18n } from "@/i18n/server";
+import { canonicalUrl, languageAlternates } from "@/i18n/metadata";
 
-export const metadata: Metadata = {
-  title: "Callback — Get the callback",
-  description:
-    "Upload your CV, paste a job, and see your ATS score, your match and exactly what to change. Free, no account, and your CV is never stored.",
-  alternates: { canonical: SITE_URL },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { locale, t } = await getI18n();
+  return {
+    title: t.meta.siteTitle,
+    description: t.meta.homeDescription,
+    alternates: { canonical: canonicalUrl("/", locale), languages: languageAlternates("/") },
+  };
+}
 
 /**
  * The marketing site (PRD section 10), in the order the brief specifies.

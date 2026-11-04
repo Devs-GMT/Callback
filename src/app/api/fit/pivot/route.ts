@@ -17,9 +17,11 @@ import { MODELS, THINKING, AiNotConfiguredError, AiRateLimitedError, AiUpstreamE
 import { PIVOT_SYSTEM, buildPivotPrompt } from "@/lib/ai/prompts";
 import { PIVOT_JSON_SCHEMA, parsePivotResponse } from "@/lib/ai/schemas";
 import { LIMITS } from "@/lib/config";
-import { isAllowedOrigin, jsonError, jsonOk, readJsonBody } from "@/lib/server/http";
+import { isAllowedOrigin, requestLocale, jsonError, jsonOk, readJsonBody } from "@/lib/server/http";
 import { consume, rateLimitHeaders } from "@/lib/server/rate-limit";
 import type { PivotRequest, PivotResponse } from "@/lib/types";
+import { fmt } from "@/i18n/config";
+import { libMessages } from "@/i18n/lib";
 
 export const maxDuration = 60;
 
@@ -33,12 +35,14 @@ function stringList(value: unknown, max: number, maxLength: number): string[] {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  const locale = requestLocale(request);
+  const api = libMessages(locale).api;
   if (!isAllowedOrigin(request)) {
-    return jsonError("bad_request", "This endpoint only serves the Callback app.");
+    return jsonError("bad_request", api.foreignOrigin);
   }
 
   if (!isAiConfigured()) {
-    return jsonError("not_configured", "The suggestions service isn't configured yet.");
+    return jsonError("not_configured", api.pivotNotConfigured);
   }
 
   const body = await readJsonBody<Partial<PivotRequest>>(
@@ -51,10 +55,10 @@ export async function POST(request: Request): Promise<Response> {
   const jobText = typeof body.data.jobText === "string" ? body.data.jobText.trim() : "";
 
   if (cvText.length < LIMITS.cvMinChars || jobText.length < LIMITS.jobMinChars) {
-    return jsonError("bad_request", "We need both the CV and the job to write suggestions.");
+    return jsonError("bad_request", api.pivotNeedsBoth);
   }
   if (cvText.length > LIMITS.cvChars || jobText.length > LIMITS.jobChars) {
-    return jsonError("too_large", "That's more text than we can work with at once.");
+    return jsonError("too_large", api.tooMuchToWrite);
   }
 
   // Shares the analyse budget: a report is one analysis plus one pivot, so
@@ -64,7 +68,7 @@ export async function POST(request: Request): Promise<Response> {
   if (!limit.allowed) {
     return jsonError(
       "rate_limited",
-      `You've used all ${LIMITS.analysesPerDay} analyses for today. Your report is still saved in this browser.`,
+      fmt(api.analysesUsedPivot, { limit: LIMITS.analysesPerDay }),
       { retryAfter: limit.resetAfter, headers },
     );
   }
@@ -85,7 +89,7 @@ export async function POST(request: Request): Promise<Response> {
       model: MODELS.pivot,
       thinking: THINKING.pivot,
       system: PIVOT_SYSTEM,
-      prompt: buildPivotPrompt(payload),
+      prompt: buildPivotPrompt(payload, locale),
       schema: PIVOT_JSON_SCHEMA,
       // Enough latitude to write well, not enough to drift from the CV's facts.
       temperature: 0.4,
@@ -96,7 +100,7 @@ export async function POST(request: Request): Promise<Response> {
     if (result.suggestions.length === 0) {
       return jsonError(
         "upstream_error",
-        "We couldn't write usable suggestions for this one. Try again.",
+        api.pivotUnusable,
         { headers },
       );
     }
@@ -106,19 +110,19 @@ export async function POST(request: Request): Promise<Response> {
     if (error instanceof AiRateLimitedError) {
       return jsonError(
         "rate_limited",
-        "The suggestions service is busy right now. Try again in a minute.",
+        api.pivotBusy,
         { retryAfter: error.retryAfter ?? 60, headers },
       );
     }
     if (error instanceof AiNotConfiguredError) {
-      return jsonError("not_configured", "The suggestions service rejected our key.", {
+      return jsonError("not_configured", api.pivotKey, {
         headers,
       });
     }
     if (error instanceof AiUpstreamError) {
-      return jsonError("upstream_error", error.message, { headers });
+      return jsonError("upstream_error", locale === "en" ? error.message : api.pivotFailed, { headers });
     }
-    return jsonError("upstream_error", "Writing suggestions failed. Please try again.", {
+    return jsonError("upstream_error", api.pivotFailed, {
       headers,
     });
   }

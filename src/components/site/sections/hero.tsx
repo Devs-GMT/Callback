@@ -2,7 +2,8 @@
 
 import { useRef } from "react";
 import Image from "next/image";
-import Link from "next/link";
+import { Link } from "@/i18n/link";
+import { useI18n } from "@/i18n/client";
 import { motion, useReducedMotion, useScroll, useTransform } from "motion/react";
 import { ArrowRight, Check, PhoneIncoming } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
@@ -41,10 +42,10 @@ const FORMAT_MARKS = [
   "Lever",
   "Workable",
   "Ashby",
-  "Company career pages",
 ] as const;
 
 function FloatingCards() {
+  const h = useI18n().t.site.hero;
   return (
     <>
       {/* "Incoming call" — the moment the product is named after. */}
@@ -63,8 +64,8 @@ function FloatingCards() {
             <PhoneIncoming className="animate-ring relative size-4" aria-hidden="true" />
           </span>
           <span className="leading-tight">
-            <span className="block text-[12.5px] font-medium">Hiring team · Acme</span>
-            <span className="block text-[11px] text-muted-dark">Incoming call…</span>
+            <span className="block text-[12.5px] font-medium">{h.callFrom}</span>
+            <span className="block text-[11px] text-muted-dark">{h.incoming}</span>
           </span>
         </div>
       </motion.div>
@@ -81,10 +82,10 @@ function FloatingCards() {
           style={{ ["--float-rotate" as string]: "1.2deg" }}
         >
           <div className="flex items-center justify-between">
-            <p className="eyebrow">Job match</p>
+            <p className="eyebrow">{h.jobMatch}</p>
             <span className="inline-flex items-center gap-1 rounded-[4px] bg-mint px-1.5 py-0.5 text-[10.5px] font-medium text-mint-ink">
               <Check className="size-3" aria-hidden="true" />
-              Re-checked
+              {h.rechecked}
             </span>
           </div>
           <p className="mt-2 flex items-baseline gap-2 font-serif text-[34px] leading-none">
@@ -100,7 +101,7 @@ function FloatingCards() {
               transition={{ duration: 1.8, delay: 2.3, ease: EASE_EDITORIAL }}
             />
           </div>
-          <p className="mt-2.5 text-[11px] text-muted">3 rewrites accepted · nothing invented</p>
+          <p className="mt-2.5 text-[11px] text-muted">{h.rewritesNote}</p>
         </div>
       </motion.div>
     </>
@@ -137,6 +138,7 @@ function SketchLines() {
 }
 
 export function Hero() {
+  const h = useI18n().t.site.hero;
   const frameRef = useRef<HTMLDivElement>(null);
   const reduce = useReducedMotion();
   const { scrollYProgress } = useScroll({
@@ -177,7 +179,7 @@ export function Hero() {
               >
                 <Image
                   src={heroPhoto}
-                  alt="A job seeker smiling as she takes a phone call at her desk"
+                  alt={h.photoAlt}
                   fill
                   preload
                   placeholder="blur"
@@ -221,9 +223,9 @@ export function Hero() {
                   className="group mb-6 inline-flex items-center gap-2 rounded-full border border-white/25 bg-espresso/50 py-1.5 pl-1.5 pr-3 text-[11.5px] text-white backdrop-blur transition-colors hover:border-white/60"
                 >
                   <span className="rounded-full bg-lilac px-2 py-0.5 text-[10.5px] font-medium text-espresso">
-                    Sample report
+                    {h.sampleTag}
                   </span>
-                  See how Alex went from 58% to 81%
+                  {h.sampleLine}
                   <ArrowRight
                     className="size-3 transition-transform duration-300 group-hover:translate-x-0.5"
                     aria-hidden="true"
@@ -233,8 +235,8 @@ export function Hero() {
 
               <SplitWords
                 as="h1"
-                text="Get the callback."
-                accent={["callback"]}
+                text={h.title}
+                accent={[h.titleAccent]}
                 immediate
                 delay={0.55}
                 stagger={0.09}
@@ -247,8 +249,7 @@ export function Hero() {
                 transition={{ duration: 0.9, delay: 1.0, ease: EASE_EDITORIAL }}
                 className="mt-5 max-w-[44ch] text-[15px] leading-relaxed text-white/75"
               >
-                Upload your CV, paste a job, and see your ATS score, your match
-                and exactly what to change — then re-check it.
+                {h.lede}
               </motion.p>
 
               <motion.div
@@ -259,7 +260,7 @@ export function Hero() {
               >
                 <Magnetic>
                   <ButtonLink href="/app" on="dark" size="lg" className="group">
-                    Check my CV
+                    {h.cta}
                     <ArrowRight
                       className="size-4 transition-transform duration-300 group-hover:translate-x-0.5"
                       aria-hidden="true"
@@ -267,7 +268,7 @@ export function Hero() {
                   </ButtonLink>
                 </Magnetic>
                 <ButtonLink href="/#sample" tone="outline" on="dark" size="lg">
-                  See a sample report
+                  {h.sample}
                 </ButtonLink>
               </motion.div>
             </div>
@@ -281,7 +282,7 @@ export function Hero() {
             className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/25 py-1 pl-1 pr-3 text-[11.5px] text-white"
           >
             <span className="rounded-full bg-lilac px-2 py-0.5 text-[10.5px] font-medium text-espresso">
-              Sample
+              {h.sampleTagShort}
             </span>
             Alex: 58% → 81%
             <ArrowRight className="size-3" aria-hidden="true" />
@@ -289,21 +290,20 @@ export function Hero() {
 
           <SplitWords
             as="h1"
-            text="Get the callback."
-            accent={["callback"]}
+            text={h.title}
+            accent={[h.titleAccent]}
             immediate
             delay={0.3}
             className="font-serif text-[3rem] leading-[1] tracking-[-0.02em] text-white"
           />
 
           <p className="mt-4 text-[14.5px] leading-relaxed text-muted-dark">
-            Upload your CV, paste a job, and see your ATS score, your match and
-            exactly what to change.
+            {h.ledeShort}
           </p>
 
           <div className="mt-6 flex flex-col gap-3">
             <ButtonLink href="/app" on="dark" size="lg" className="w-full">
-              Check my CV
+              {h.cta}
             </ButtonLink>
             <ButtonLink
               href="/#sample"
@@ -312,7 +312,7 @@ export function Hero() {
               size="lg"
               className="w-full"
             >
-              See a sample report
+              {h.sample}
             </ButtonLink>
           </div>
         </div>
@@ -326,9 +326,9 @@ export function Hero() {
           transition={{ duration: 1, delay: 1.4 }}
           className="mt-12 flex flex-col gap-4 border-t border-espresso-line pt-7 md:mt-14 md:flex-row md:items-center md:gap-10"
         >
-          <p className="eyebrow eyebrow-on-dark shrink-0">Reads CVs and jobs from</p>
+          <p className="eyebrow eyebrow-on-dark shrink-0">{h.readsFrom}</p>
           <Marquee className="marquee-fade min-w-0 flex-1" duration={32}>
-            {FORMAT_MARKS.map((mark) => (
+            {[...FORMAT_MARKS, h.careerPages].map((mark) => (
               <span
                 key={mark}
                 className="flex items-center gap-10 pr-10 font-serif text-[19px] italic text-white/55"

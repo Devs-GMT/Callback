@@ -6,6 +6,7 @@ import { toggleHeading } from "@/lib/analysis/cv-layout";
 import { insertLink, safeHref, toggleBullets, toggleMarker } from "@/lib/analysis/inline";
 import { LIMITS } from "@/lib/config";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/i18n/client";
 
 /**
  * The Improved CV's text editor with a formatting toolbar.
@@ -27,6 +28,8 @@ export function CvEditor({
   initialSelection?: { start: number; end: number } | null;
 }) {
   const area = useRef<HTMLTextAreaElement>(null);
+  const { locale, t } = useI18n();
+  const ed = t.report.editor;
   const [linking, setLinking] = useState<{ start: number; end: number } | null>(null);
   const [url, setUrl] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
@@ -89,7 +92,7 @@ export function CvEditor({
       setNotice(null);
       apply(next);
     } else {
-      setNotice("Put the cursor on a short line (under 48 characters) to make it a heading.");
+      setNotice(ed.headingNotice);
     }
   };
 
@@ -127,22 +130,22 @@ export function CvEditor({
     <div className="flex flex-col gap-2">
       <div
         role="toolbar"
-        aria-label="Formatting"
+        aria-label={ed.toolbar}
         className="flex flex-wrap items-center gap-1 rounded-[6px] bg-white p-1 ring-1 ring-line"
       >
-        <ToolButton label="Bold (Ctrl+B)" onClick={() => mark("**")}>
+        <ToolButton label={ed.bold} onClick={() => mark("**")}>
           <Bold className="size-3.5" aria-hidden="true" />
         </ToolButton>
-        <ToolButton label="Italic (Ctrl+I)" onClick={() => mark("*")}>
+        <ToolButton label={ed.italic} onClick={() => mark("*")}>
           <Italic className="size-3.5" aria-hidden="true" />
         </ToolButton>
-        <ToolButton label="Link (Ctrl+K)" onClick={startLink} pressed={linking !== null}>
+        <ToolButton label={ed.link} onClick={startLink} pressed={linking !== null}>
           <Link2 className="size-3.5" aria-hidden="true" />
         </ToolButton>
-        <ToolButton label="Bullet list" onClick={bullets}>
+        <ToolButton label={ed.bullets} onClick={bullets}>
           <List className="size-3.5" aria-hidden="true" />
         </ToolButton>
-        <ToolButton label="Section heading — make this line a new section" onClick={heading}>
+        <ToolButton label={ed.heading} onClick={heading}>
           <Heading className="size-3.5" aria-hidden="true" />
         </ToolButton>
 
@@ -155,7 +158,7 @@ export function CvEditor({
             }}
           >
             <label className="sr-only" htmlFor="cv-link-url">
-              Link address
+              {ed.linkAddress}
             </label>
             <input
               id="cv-link-url"
@@ -169,19 +172,19 @@ export function CvEditor({
                 }
               }}
               placeholder="https://github.com/you"
-              className="h-8 min-w-0 flex-1 rounded-[4px] border border-line px-2 text-[12.5px] focus:border-espresso/50 focus:outline-none"
+              className="h-11 min-w-0 flex-1 rounded-[4px] border border-line px-2 text-[12.5px] focus:border-espresso/50 focus:outline-none md:h-8"
             />
             <button
               type="submit"
               disabled={!safeHref(url)}
-              className="h-8 rounded-[4px] bg-espresso-btn px-3 text-[12px] font-medium text-white disabled:opacity-40"
+              className="h-11 rounded-[4px] bg-espresso-btn px-3 text-[12px] font-medium text-white disabled:opacity-40 md:h-8"
             >
-              Add link
+              {ed.addLink}
             </button>
           </form>
         ) : (
           <span className="ml-auto hidden px-2 text-[11.5px] text-muted sm:inline">
-            Select text, then format it. Bold and italic carry into the PDF and .docx.
+            {ed.selectHint}
           </span>
         )}
       </div>
@@ -193,7 +196,7 @@ export function CvEditor({
       ) : null}
 
       <label className="sr-only" htmlFor="cv-editor">
-        Your improved CV
+        {ed.label}
       </label>
       <textarea
         id="cv-editor"
@@ -212,11 +215,11 @@ export function CvEditor({
       />
       <p className="flex flex-wrap justify-between gap-2 text-[11.5px] text-muted">
         <span>
-          <code>**bold**</code> · <code>*italic*</code> · <code>[text](link)</code> · a line starting with{" "}
-          <code>•</code> is a bullet · a short line in CAPITALS is a section heading
+          <code>**bold**</code> · <code>*italic*</code> · <code>[text](link)</code> · {ed.syntaxBullet}{" "}
+          <code>•</code> {ed.syntaxRest}
         </span>
         <span className={over ? "text-coral-ink" : undefined}>
-          {value.length.toLocaleString("en")} / {LIMITS.cvChars.toLocaleString("en")}
+          {value.length.toLocaleString(locale)} / {LIMITS.cvChars.toLocaleString(locale)}
         </span>
       </p>
     </div>
@@ -244,7 +247,7 @@ function ToolButton({
       onMouseDown={(event) => event.preventDefault()}
       onClick={onClick}
       className={cn(
-        "grid size-9 place-items-center rounded-[4px] text-ink transition-colors hover:bg-sand",
+        "grid size-11 place-items-center rounded-[4px] text-ink transition-colors hover:bg-sand md:size-9",
         "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-espresso-btn",
         pressed && "bg-sand",
       )}

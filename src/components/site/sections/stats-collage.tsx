@@ -15,6 +15,8 @@ import {
 import { fetchStats } from "@/lib/chain/wallet";
 import { IS_CONTRACT_DEPLOYED } from "@/lib/config";
 import { formatCount, cn } from "@/lib/utils";
+import { useI18n } from "@/i18n/client";
+import { fmt } from "@/i18n/config";
 import {
   EASE_EDITORIAL,
   Reveal,
@@ -34,57 +36,27 @@ import {
  * "we never invent anything" would undercut the product.
  */
 
-type Stat = { value: string; label: string; note: string };
-
-const COLLAGE_CARDS: Array<{
-  art: ReactNode;
-  title: string;
-  line: string;
-}> = [
-  {
-    art: <CollageMagnifier />,
-    title: "Get past the ATS",
-    line: "Seven weighted checks on what the parser can actually read.",
-  },
-  {
-    art: <CollagePaperPlane />,
-    title: "Send better applications",
-    line: "One CV, re-angled per job, instead of the same file forty times.",
-  },
-  {
-    art: <CollageKey />,
-    title: "Unlock the right keywords",
-    line: "The terms this job scans for, and which ones you already have.",
-  },
-  {
-    art: <CollageRetroPhone />,
-    title: "Get the callback",
-    line: "Track every application until one of them rings.",
-  },
-  {
-    art: <CollageClock />,
-    title: "Save hours per application",
-    line: "Forty seconds of checking beats an evening of guessing.",
-  },
-  {
-    art: <CollageBust />,
-    title: "Keep your own voice",
-    line: "Rewrites use your facts and your words — never a template.",
-  },
-];
+type Stat = { id: string; value: string; label: string; note: string };
 
 export function StatsCollage() {
+  const { t } = useI18n();
+  const s = t.site.stats;
+  const l = t.site.collage;
+  const arts: ReactNode[] = [
+    <CollageMagnifier key="m" label={l.magnifier} />,
+    <CollagePaperPlane key="p" label={l.plane} />,
+    <CollageKey key="k" label={l.key} />,
+    <CollageRetroPhone key="r" label={l.phone} />,
+    <CollageClock key="c" label={l.clock} />,
+    <CollageBust key="b" label={l.bust} />,
+  ];
+  const COLLAGE_CARDS: Array<{ art: ReactNode; title: string; line: string }> = s.cards.map(
+    (card, index) => ({ ...card, art: arts[index] }),
+  );
+
   const [stats, setStats] = useState<Stat[]>([
-    {
-      value: "7",
-      label: "weighted ATS checks",
-      note: "Readability, sections, contact, dates, formatting, length, bullets.",
-    },
-    {
-      value: "3",
-      label: "ways to add a CV",
-      note: "Upload a PDF or Word file, paste the text, or give a public link.",
-    },
+    { id: "checks", value: "7", ...s.checks },
+    { id: "ways", value: "3", ...s.ways },
   ]);
   const [statIndex, setStatIndex] = useState(0);
   const [cardIndex, setCardIndex] = useState(0);
@@ -110,25 +82,39 @@ export function StatsCollage() {
       const live: Stat[] = [];
       if (result.reports > 0) {
         live.push({
+          id: "stamped",
           value: formatCount(result.reports),
-          label: "reports stamped on BOT Chain",
-          note: "Every one verifiable on the explorer, with no personal data on-chain.",
+          ...s.stamped,
         });
       }
       if (result.rechecks > 0) {
         live.push({
+          id: "rechecks",
           value: formatCount(result.rechecks),
-          label: "re-checks recorded",
-          note: "A re-check links to the report it improved on, so progress is provable.",
+          ...s.rechecks,
         });
       }
-      if (live.length > 0) setStats((current) => [...live, ...current]);
+      if (live.length > 0) {
+        // Fast Refresh and Strict Mode can replay this effect while the state
+        // survives, so merge by id instead of prepending a second copy.
+        setStats((current) => {
+          const seen = new Set<string>();
+          const base = current.filter((item) => {
+            if (seen.has(item.id)) return false;
+            seen.add(item.id);
+            return true;
+          });
+          const fresh = live.filter((item) => !seen.has(item.id));
+          if (fresh.length === 0 && base.length === current.length) return current;
+          return [...fresh, ...base];
+        });
+      }
     });
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [s.stamped, s.rechecks]);
 
   // Rotate the stat on a timer, pausing for anyone who asked for less motion.
   useEffect(() => {
@@ -152,11 +138,11 @@ export function StatsCollage() {
         {/* ---------- Left: headline and the rotating stat ---------- */}
         <div>
           <Reveal>
-            <p className="eyebrow mb-4">Why it matters</p>
+            <p className="eyebrow mb-4">{s.eyebrow}</p>
           </Reveal>
           <SplitWords
-            text="The rules of applying, rewritten."
-            accent={["rewritten."]}
+            text={s.title}
+            accent={[s.titleAccent]}
             accentClassName="italic text-[#8a63d2]"
             className="display-2 max-w-[18ch] font-serif text-ink"
           />
@@ -167,7 +153,7 @@ export function StatsCollage() {
             </span>
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
-                key={stat.label}
+                key={stat.id}
                 aria-hidden="true"
                 initial={{ opacity: 0, y: 30, filter: "blur(6px)" }}
                 animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
@@ -190,10 +176,10 @@ export function StatsCollage() {
           <div className="mt-7 flex items-center gap-2">
             {stats.map((candidate, index) => (
               <button
-                key={candidate.label}
+                key={candidate.id}
                 type="button"
                 onClick={() => setStatIndex(index)}
-                aria-label={`Show: ${candidate.label}`}
+                aria-label={fmt(s.show, { label: candidate.label })}
                 aria-current={index === statIndex}
                 className={cn(
                   "h-1.5 rounded-full transition-all",
@@ -262,7 +248,7 @@ export function StatsCollage() {
                   key={direction}
                   type="button"
                   onClick={() => scrollCards(direction)}
-                  aria-label={direction === -1 ? "Previous card" : "Next card"}
+                  aria-label={direction === -1 ? s.previous : s.next}
                   className="inline-flex size-11 items-center justify-center rounded-full border border-ink/15 text-ink transition-all duration-300 hover:border-ink hover:bg-ink hover:text-white md:size-10"
                 >
                   {direction === -1 ? (

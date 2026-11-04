@@ -6,6 +6,7 @@ import { useWallet } from "@/components/app/wallet-context";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { shortAddress } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { RefreshCw } from "lucide-react";
 
 /**
  * The wallet control, in all five of its states.
@@ -15,6 +16,9 @@ import { cn } from "@/lib/utils";
  * stamping works without a wallet and a visitor who thinks they need MetaMask
  * to check their CV will leave.
  */
+import { useI18n } from "@/i18n/client";
+import { fmt } from "@/i18n/config";
+
 export function WalletButton({
   on = "light",
   compact,
@@ -26,6 +30,7 @@ export function WalletButton({
   className?: string;
 }) {
   const wallet = useWallet();
+  const wb = useI18n().t.app.wallet;
 
   const body = (() => {
     switch (wallet.status) {
@@ -35,7 +40,8 @@ export function WalletButton({
         return (
           <span
             className={cn(
-              "inline-block h-10 w-[116px] rounded-[4px]",
+              "inline-block h-10 rounded-[4px]",
+              compact ? "w-[92px]" : "w-[116px]",
               on === "dark" ? "bg-white/10" : "bg-ink/[0.06]",
             )}
             aria-hidden="true"
@@ -49,9 +55,10 @@ export function WalletButton({
             external
             tone="outline"
             on={on}
-            size="md"
+            size={compact ? "sm" : "md"}
+            title={compact ? wb.install : undefined}
           >
-            Install MetaMask
+            {compact ? wb.installShort : wb.install}
           </ButtonLink>
         );
 
@@ -60,26 +67,35 @@ export function WalletButton({
           <Button
             tone="outline"
             on={on}
-            size="md"
+            size={compact ? "sm" : "md"}
             onClick={() => void wallet.connect()}
             disabled={wallet.busy}
+            title={compact ? wb.connect : undefined}
           >
-            {wallet.busy ? "Connecting…" : "Connect wallet"}
+            {wallet.busy ? wb.connecting : compact ? wb.connectShort : wb.connect}
           </Button>
         );
 
-      case "wrong-network":
+      case "wrong-network": {
+        const full = fmt(wb.switchTo, { chain: ACTIVE_CHAIN.name });
         return (
           <Button
             tone="primary"
             on={on}
-            size="md"
+            size={compact ? "sm" : "md"}
             onClick={() => void wallet.switchNetwork()}
             disabled={wallet.busy}
+            title={full}
+            aria-label={full}
           >
-            {wallet.busy ? "Switching…" : `Switch to ${ACTIVE_CHAIN.name}`}
+            <RefreshCw
+              className={cn("size-3.5 shrink-0", wallet.busy && "animate-spin")}
+              aria-hidden="true"
+            />
+            {wallet.busy ? wb.switching : compact ? wb.switchShort : full}
           </Button>
         );
+      }
 
       case "connected":
         return (
@@ -100,7 +116,7 @@ export function WalletButton({
               {shortAddress(wallet.address ?? "")}
             </span>
             <span className="sr-only">
-              Connected to {ACTIVE_CHAIN.name} as {wallet.address}
+              {fmt(wb.connectedAs, { chain: ACTIVE_CHAIN.name, address: wallet.address ?? "" })}
             </span>
           </span>
         );

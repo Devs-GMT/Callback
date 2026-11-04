@@ -4,6 +4,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { TornPaper } from "@/components/site/torn-photo";
 import { Magnetic, Parallax, Reveal, SplitWords } from "@/components/motion/primitives";
 import rotaryPhone from "../../../../public/images/rotary-phone.jpg";
+import { getI18n } from "@/i18n/server";
 
 /**
  * Section 10: the closing CTA (PRD section 10).
@@ -13,7 +14,8 @@ import rotaryPhone from "../../../../public/images/rotary-phone.jpg";
  * white, so a multiply blend drops its background into the sand panel and it
  * reads as a cut-out rather than a rectangle.
  */
-export function ClosingCta() {
+export async function ClosingCta() {
+  const cl = (await getI18n()).t.site.closing;
   return (
     <section className="section-light pb-24 md:pb-32">
       <div className="shell">
@@ -24,25 +26,24 @@ export function ClosingCta() {
         >
           <div className="relative grid items-center gap-10 lg:grid-cols-[1.15fr_0.85fr]">
             <div className="text-center lg:text-left">
-              <p className="eyebrow mb-5">Ready when you are</p>
+              <p className="eyebrow mb-5">{cl.eyebrow}</p>
 
               <SplitWords
-                text="Your next callback starts here."
-                accent={["callback"]}
+                text={cl.title}
+                accent={[cl.titleAccent]}
                 accentClassName="italic text-[#8a63d2]"
                 className="display-1 mx-auto max-w-[16ch] font-serif text-ink lg:mx-0"
               />
 
               <Reveal delay={0.3}>
                 <p className="mx-auto mt-6 max-w-[48ch] text-[15px] leading-relaxed text-muted lg:mx-0">
-                  One CV, one job, forty seconds. You&apos;ll know your ATS score,
-                  your match, and the three changes worth making.
+                  {cl.lede}
                 </p>
 
                 <div className="mt-9 flex flex-wrap justify-center gap-3 lg:justify-start">
                   <Magnetic>
                     <ButtonLink href="/app" size="lg" className="group">
-                      Check my CV
+                      {cl.cta}
                       <ArrowRight
                         className="size-4 transition-transform duration-300 group-hover:translate-x-0.5"
                         aria-hidden="true"
@@ -50,12 +51,12 @@ export function ClosingCta() {
                     </ButtonLink>
                   </Magnetic>
                   <ButtonLink href="/#sample" tone="outline" size="lg">
-                    See a sample report
+                    {cl.sample}
                   </ButtonLink>
                 </div>
 
                 <p className="mt-6 text-[11.5px] text-muted">
-                  Free · No account · Your CV is never stored
+                  {cl.small}
                 </p>
               </Reveal>
             </div>

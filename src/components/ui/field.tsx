@@ -3,6 +3,7 @@
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
 import { useId } from "react";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/i18n/client";
 
 /**
  * Labelled form controls.
@@ -157,12 +158,13 @@ export function TextAreaField({
   rows = 10,
   ...props
 }: TextAreaFieldProps) {
+  const { locale } = useI18n();
   const over = limit !== undefined && value.length > limit;
 
   const counter =
     limit !== undefined ? (
       <span className={over ? "text-coral-ink" : undefined}>
-        {value.length.toLocaleString("en")} / {limit.toLocaleString("en")}
+        {value.length.toLocaleString(locale)} / {limit.toLocaleString(locale)}
       </span>
     ) : (
       trailing

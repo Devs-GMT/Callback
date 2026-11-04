@@ -18,9 +18,11 @@ import { COVER_LETTER_SYSTEM, buildCoverLetterPrompt } from "@/lib/ai/prompts";
 import { COVER_LETTER_JSON_SCHEMA, parseCoverLetterResponse } from "@/lib/ai/schemas";
 import { verifyCoverLetter } from "@/lib/analysis/cover-letter";
 import { LIMITS } from "@/lib/config";
-import { isAllowedOrigin, jsonError, jsonOk, readJsonBody } from "@/lib/server/http";
+import { isAllowedOrigin, requestLocale, jsonError, jsonOk, readJsonBody } from "@/lib/server/http";
 import { consume, rateLimitHeaders } from "@/lib/server/rate-limit";
 import type { CoverLetterRequest, CoverLetterResponse } from "@/lib/types";
+import { fmt } from "@/i18n/config";
+import { libMessages } from "@/i18n/lib";
 
 export const maxDuration = 60;
 
@@ -68,12 +70,14 @@ function strengthList(value: unknown): CoverLetterRequest["strengths"] {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  const locale = requestLocale(request);
+  const api = libMessages(locale).api;
   if (!isAllowedOrigin(request)) {
-    return jsonError("bad_request", "This endpoint only serves the Callback app.");
+    return jsonError("bad_request", api.foreignOrigin);
   }
 
   if (!isAiConfigured()) {
-    return jsonError("not_configured", "The cover letter service isn't configured yet.");
+    return jsonError("not_configured", api.letterNotConfigured);
   }
 
   const body = await readJsonBody<Partial<CoverLetterRequest>>(
@@ -86,10 +90,10 @@ export async function POST(request: Request): Promise<Response> {
   const jobText = typeof body.data.jobText === "string" ? body.data.jobText.trim() : "";
 
   if (cvText.length < LIMITS.cvMinChars || jobText.length < LIMITS.jobMinChars) {
-    return jsonError("bad_request", "We need both the CV and the job to write a cover letter.");
+    return jsonError("bad_request", api.letterNeedsBoth);
   }
   if (cvText.length > LIMITS.cvChars || jobText.length > LIMITS.jobChars) {
-    return jsonError("too_large", "That's more text than we can work with at once.");
+    return jsonError("too_large", api.tooMuchToWrite);
   }
 
   const limit = await consume(request, "cover-letter", LIMITS.coverLettersPerDay);
@@ -97,7 +101,7 @@ export async function POST(request: Request): Promise<Response> {
   if (!limit.allowed) {
     return jsonError(
       "rate_limited",
-      `You've written all ${LIMITS.coverLettersPerDay} cover letters for today. Any letter you have is saved in this browser.`,
+      fmt(api.lettersUsed, { limit: LIMITS.coverLettersPerDay }),
       { retryAfter: limit.resetAfter, headers },
     );
   }
@@ -138,7 +142,7 @@ export async function POST(request: Request): Promise<Response> {
     if (draft.opening.length === 0 || draft.body.length === 0) {
       return jsonError(
         "upstream_error",
-        "We couldn't write a letter we could back up with your CV. Try again.",
+        api.letterUnbacked,
         { headers },
       );
     }
@@ -149,19 +153,19 @@ export async function POST(request: Request): Promise<Response> {
     if (error instanceof AiRateLimitedError) {
       return jsonError(
         "rate_limited",
-        "The cover letter service is busy right now. Try again in a minute.",
+        api.letterBusy,
         { retryAfter: error.retryAfter ?? 60, headers },
       );
     }
     if (error instanceof AiNotConfiguredError) {
-      return jsonError("not_configured", "The cover letter service rejected our key.", {
+      return jsonError("not_configured", api.letterKey, {
         headers,
       });
     }
     if (error instanceof AiUpstreamError) {
-      return jsonError("upstream_error", error.message, { headers });
+      return jsonError("upstream_error", locale === "en" ? error.message : api.letterFailed, { headers });
     }
-    return jsonError("upstream_error", "Writing the letter failed. Please try again.", {
+    return jsonError("upstream_error", api.letterFailed, {
       headers,
     });
   }

@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
+import { Link } from "@/i18n/link";
+import { useI18n } from "@/i18n/client";
+import { fmt } from "@/i18n/config";
+import { LanguageSwitcher } from "@/components/ui/language-switcher";
 import { motion } from "motion/react";
 import { EASE_EDITORIAL } from "@/components/motion/primitives";
 import { Check, Copy, ExternalLink } from "lucide-react";
@@ -31,42 +34,50 @@ import { formatCount, shortAddress } from "@/lib/utils";
  * is unreachable is worse than no counter.
  */
 
-const COLUMNS = [
-  {
-    heading: "Product",
-    links: [
-      { href: "/app", label: "Check my CV" },
-      { href: "/#sample", label: "Sample report" },
-      { href: "/app/applications", label: "My applications" },
-    ],
-  },
-  {
-    heading: "Who it's for",
-    links: [
-      { href: "/#who", label: "Students" },
-      { href: "/#who", label: "Graduates" },
-      { href: "/#who", label: "Career changers" },
-      { href: "/#who", label: "Tech roles" },
-    ],
-  },
-  {
-    heading: "Resources",
-    links: [
-      { href: "/#faq", label: "What is an ATS?" },
-      { href: "/#features", label: "CV tips" },
-      { href: "/#faq", label: "FAQ" },
-    ],
-  },
-  {
-    heading: "Company",
-    links: [
-      { href: "/#how", label: "About" },
-      { href: BRAND.githubUrl, label: "GitHub", external: true },
-    ],
-  },
-] as const;
+type FooterColumn = {
+  heading: string;
+  links: Array<{ href: string; label: string; external?: boolean }>;
+};
 
 export function SiteFooter() {
+  const { t } = useI18n();
+  const f = t.site.footer;
+  const c = f.columns;
+  const COLUMNS: FooterColumn[] = [
+    {
+      heading: c.product.heading,
+      links: [
+        { href: "/app", label: c.product.check },
+        { href: "/#sample", label: c.product.sample },
+        { href: "/app/applications", label: c.product.applications },
+      ],
+    },
+    {
+      heading: c.who.heading,
+      links: [
+        { href: "/#who", label: c.who.students },
+        { href: "/#who", label: c.who.graduates },
+        { href: "/#who", label: c.who.changers },
+        { href: "/#who", label: c.who.tech },
+      ],
+    },
+    {
+      heading: c.resources.heading,
+      links: [
+        { href: "/#faq", label: c.resources.ats },
+        { href: "/#features", label: c.resources.tips },
+        { href: "/#faq", label: c.resources.faq },
+      ],
+    },
+    {
+      heading: c.company.heading,
+      links: [
+        { href: "/#how", label: c.company.about },
+        { href: BRAND.githubUrl, label: c.company.github, external: true },
+      ],
+    },
+  ];
+
   const [stamped, setStamped] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -101,19 +112,18 @@ export function SiteFooter() {
           <div>
             <Wordmark />
             <p className="mt-3 max-w-[30ch] text-[12.5px] leading-relaxed text-muted">
-              Add your CV and a job. See how ATS-friendly your CV is, how well
-              it matches, and exactly what to change.
+              {f.tagline}
             </p>
           </div>
 
-          <nav aria-label="Footer" className="grid grid-cols-2 gap-8 sm:grid-cols-4">
+          <nav aria-label={f.label} className="grid grid-cols-2 gap-8 sm:grid-cols-4">
             {COLUMNS.map((column) => (
               <div key={column.heading}>
                 <h2 className="eyebrow mb-3">{column.heading}</h2>
                 <ul className="flex flex-col gap-2">
                   {column.links.map((link) => (
                     <li key={`${column.heading}-${link.label}`}>
-                      {"external" in link && link.external ? (
+                      {link.external ? (
                         <a
                           href={link.href}
                           target="_blank"
@@ -148,10 +158,10 @@ export function SiteFooter() {
             className="group flex items-center gap-3"
           >
             <span className="flex size-12 shrink-0 items-center justify-center rounded-full border border-line bg-white transition-colors group-hover:border-ink/40">
-              <Image src={botChainLogo} alt="BOT Chain logo" className="size-7" />
+              <Image src={botChainLogo} alt={f.botChainLogo} className="size-7" />
             </span>
             <span className="text-[12px] leading-tight">
-              <span className="block font-medium text-ink">Built on BOT Chain</span>
+              <span className="block font-medium text-ink">{f.builtOn}</span>
               <span className="block text-muted">botchain.ai ↗</span>
             </span>
           </a>
@@ -168,9 +178,9 @@ export function SiteFooter() {
               </span>
             </span>
             <span className="text-[12px] leading-tight">
-              <span className="block font-medium text-ink">Verified on-chain</span>
+              <span className="block font-medium text-ink">{f.verified}</span>
               <span className="block text-muted">
-                Chain {ACTIVE_CHAIN.chainId} · {ACTIVE_CHAIN.name}
+                {fmt(f.chainLine, { chainId: ACTIVE_CHAIN.chainId, chain: ACTIVE_CHAIN.name })}
               </span>
             </span>
           </div>
@@ -192,7 +202,7 @@ export function SiteFooter() {
                     <Copy className="size-3.5 text-muted" aria-hidden="true" />
                   )}
                   <span className="sr-only">
-                    {copied ? "Address copied" : "Copy the contract address"}
+                    {copied ? f.copied : f.copy}
                   </span>
                 </button>
 
@@ -202,54 +212,51 @@ export function SiteFooter() {
                   rel="noopener noreferrer"
                   className="inline-flex min-h-11 items-center gap-1.5 rounded-[4px] bg-espresso-btn px-3 text-[12px] font-medium text-white transition-colors hover:bg-espresso md:min-h-9"
                 >
-                  View on explorer
+                  {f.explorer}
                   <ExternalLink className="size-3" aria-hidden="true" />
                 </a>
               </>
             ) : (
               <span className="rounded-[4px] bg-sand px-2.5 py-2 text-[11.5px] text-muted">
-                Contract address published once deployed to {ACTIVE_CHAIN.name}
+                {fmt(f.notDeployed, { chain: ACTIVE_CHAIN.name })}
               </span>
             )}
           </div>
 
           {stamped !== null ? (
             <p className="text-[11.5px] text-muted" aria-live="polite">
-              Reports stamped: {formatCount(stamped)}
+              {fmt(f.stamped, { count: formatCount(stamped) })}
             </p>
           ) : null}
         </div>
 
         {/* ---------- Disclaimer ---------- */}
         <p className="mt-8 max-w-[92ch] text-[11.5px] leading-relaxed text-muted">
-          Callback is an independent project and is not affiliated with any job
-          board or ATS vendor. Names of third-party products are used for
-          compatibility purposes only and remain the trademarks of their
-          respective owners. Scores are guidance, not a hiring guarantee. Your CV
-          is never stored and never put on-chain.
+          {f.disclaimer}
         </p>
 
         {/* ---------- Bottom row ---------- */}
         <div className="mt-8 flex flex-wrap items-center justify-between gap-y-4 border-t border-line pt-6">
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[11.5px] text-muted">
-            <span>© 2026 Callback. All rights reserved.</span>
+            <span>{f.rights}</span>
             <Link href="/privacy" className="transition-colors hover:text-ink">
-              Privacy Policy
+              {f.privacy}
             </Link>
             <Link href="/terms" className="transition-colors hover:text-ink">
-              Terms
+              {f.terms}
             </Link>
+            <LanguageSwitcher variant="list" />
           </div>
 
           <div className="flex items-center gap-3">
             <span className="font-script text-[20px] leading-none text-ink">
-              Follow us
+              {f.follow}
             </span>
             <a
               href={BRAND.xUrl}
               target="_blank"
               rel="noopener noreferrer"
-              aria-label="Callback on X"
+              aria-label={f.onX}
               className="flex size-9 items-center justify-center rounded-full border border-line text-ink transition-colors hover:border-ink/40"
             >
               {/* X's glyph, drawn inline: it is not in the icon set in use. */}
@@ -261,7 +268,7 @@ export function SiteFooter() {
               href={BRAND.githubUrl}
               target="_blank"
               rel="noopener noreferrer"
-              aria-label="Callback on GitHub"
+              aria-label={f.onGithub}
               className="flex size-9 items-center justify-center rounded-full border border-line text-ink transition-colors hover:border-ink/40"
             >
               <svg viewBox="0 0 24 24" className="size-4" fill="currentColor" aria-hidden="true">

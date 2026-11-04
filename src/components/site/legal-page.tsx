@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
+import { Link } from "@/i18n/link";
+import { getI18n } from "@/i18n/server";
 import { Navbar } from "@/components/site/navbar";
 import { SiteFooter } from "@/components/site/footer";
 
@@ -12,7 +13,7 @@ import { SiteFooter } from "@/components/site/footer";
  * claims more data collection than the product performs is as misleading as
  * one that claims less.
  */
-export function LegalPage({
+export async function LegalPage({
   title,
   updated,
   intro,
@@ -23,6 +24,7 @@ export function LegalPage({
   intro: string;
   children: ReactNode;
 }) {
+  const lg = (await getI18n()).t.legal;
   return (
     <>
       <Navbar surface="light" />
@@ -36,14 +38,14 @@ export function LegalPage({
           <div className="mt-12 flex flex-col gap-10">{children}</div>
 
           <p className="mt-14 border-t border-line pt-6 text-[12.5px] text-muted">
-            Questions about any of this?{" "}
+            {lg.questions}{" "}
             <Link
               href="/#faq"
               className="underline decoration-line underline-offset-2 transition-colors hover:decoration-ink"
             >
-              The FAQ
+              {lg.faq}
             </Link>{" "}
-            covers the same ground in plainer language.
+            {lg.plainer}
           </p>
         </div>
       </main>

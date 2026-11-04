@@ -173,14 +173,14 @@ Link can't be read (login wall, LinkedIn, timeout, private address) → "Paste t
 Job text too short (< 300 chars) → "This doesn't look like a full job description"
 Not a CV / not a job (AI check) → friendly warning, user can continue
 AI error / rate limit → show the rule-based ATS check anyway + [Retry] for the match
-Language: MVP supports English; other languages → "Best results in English" note
+Language: English (default), Indonesian and Malay; other languages still get a report, but treat bullet-quality and keyword parts as rough
 Tx pending / rejected / failed → message + retry; unknown ?report= → "Report not found"
 
 
 12. Out of scope (MVP)
 
 
-Auto-applying to jobs, scraping LinkedIn, CV design templates, cover-letter generator (maybe later), recruiter accounts, saving CVs on a server, multiple languages, payments, NFTs.
+Auto-applying to jobs, scraping LinkedIn, CV design templates, cover-letter generator (maybe later), recruiter accounts, saving CVs on a server, payments, NFTs.
 
 
 

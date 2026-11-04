@@ -6,6 +6,8 @@ import { Check } from "lucide-react";
 import { Card, Eyebrow } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ANALYSIS_STEPS, type AnalysisStepId } from "@/components/app/use-analysis";
+import { useI18n } from "@/i18n/client";
+import { clientMessages } from "@/i18n/lib";
 import { EASE_EDITORIAL } from "@/components/motion/primitives";
 import { cn } from "@/lib/utils";
 
@@ -22,13 +24,6 @@ import { cn } from "@/lib/utils";
  * model, and a user who wants to fix their input should not have to reload.
  */
 
-const TIPS = [
-  "Two-column CVs are often read across the columns — that's why we flag them.",
-  "A requirement only counts as matched if we can quote your CV.",
-  "Bullets that start with a verb and include a number score higher.",
-  "Rewrites only rephrase facts you already have. Nothing is invented.",
-  "Your CV text is never stored or logged — it exists for this request only.",
-];
 
 /** Chips that appear on the page as each step runs. */
 const MARKS: Record<string, Array<{ text: string; tone: string; x: string; y: string }>> = {};
@@ -44,7 +39,10 @@ ANALYSIS_STEPS.forEach((step, index) => {
 });
 
 function ScanningPage({ currentIndex }: { currentIndex: number }) {
-  const visible = ANALYSIS_STEPS.slice(0, currentIndex + 1).flatMap((step) => MARKS[step.id]);
+  const labels = useI18n().t.app.analysing.marks;
+  const visible = ANALYSIS_STEPS.slice(0, currentIndex + 1).flatMap((step, index) =>
+    MARKS[step.id].map((mark) => ({ ...mark, text: labels[index] ?? mark.text })),
+  );
 
   return (
     <div className="relative mx-auto aspect-[3/4] w-full max-w-[260px]" aria-hidden="true">
@@ -113,6 +111,10 @@ export function Analysing({
   onCancel: () => void;
   isRecheck?: boolean;
 }) {
+  const { t } = useI18n();
+  const a = t.app.analysing;
+  const TIPS = a.tips;
+  const stepLabel = (id: AnalysisStepId) => clientMessages().analysis.steps[id];
   const currentIndex = ANALYSIS_STEPS.findIndex((candidate) => candidate.id === step);
   const progress = ((currentIndex + 0.5) / ANALYSIS_STEPS.length) * 100;
   const reduce = useReducedMotion();
@@ -129,7 +131,7 @@ export function Analysing({
     if (reduce) return;
     const timer = setInterval(() => setTip((value) => (value + 1) % TIPS.length), 5000);
     return () => clearInterval(timer);
-  }, [reduce]);
+  }, [reduce, TIPS.length]);
 
   return (
     <motion.div
@@ -147,17 +149,17 @@ export function Analysing({
           {/* ---------- The steps ---------- */}
           <div className="flex flex-col p-6 md:p-8">
             <div className="flex items-center justify-between gap-3">
-              <Eyebrow>{isRecheck ? "Re-checking" : "Analysing"}</Eyebrow>
+              <Eyebrow>{isRecheck ? a.rechecking : a.analysing}</Eyebrow>
               <span className="font-mono text-[11.5px] tabular-nums text-muted">
                 {Math.floor(seconds / 60)}:
                 {String(seconds % 60).padStart(2, "0")}
               </span>
             </div>
             <h1 className="mt-2 font-serif text-[26px] leading-snug text-ink">
-              {isRecheck ? "Scoring your improved CV" : "Reading your CV against the job"}
+              {isRecheck ? a.recheckTitle : a.title}
             </h1>
             <p className="mt-1.5 text-[13px] leading-relaxed text-muted">
-              This usually takes 20 to 40 seconds.
+              {a.duration}
             </p>
 
             {/* Overall progress. */}
@@ -216,7 +218,7 @@ export function Analysing({
                         !done && !active && "text-muted/70",
                       )}
                     >
-                      {candidate.label}
+                      {stepLabel(candidate.id)}
                     </span>
                   </li>
                 );
@@ -225,7 +227,7 @@ export function Analysing({
 
             {/* One live region for the whole list. */}
             <p aria-live="polite" className="sr-only">
-              {ANALYSIS_STEPS[currentIndex]?.label ?? "Working"}
+              {ANALYSIS_STEPS[currentIndex] ? stepLabel(ANALYSIS_STEPS[currentIndex].id) : a.working}
             </p>
 
             <div className="mt-5 min-h-[44px] rounded-[10px] border border-dashed border-line px-3.5 py-2.5">
@@ -238,7 +240,7 @@ export function Analysing({
                   transition={{ duration: 0.35 }}
                   className="text-[12px] leading-relaxed text-muted"
                 >
-                  <span className="font-medium text-ink">Tip · </span>
+                  <span className="font-medium text-ink">{a.tip}</span>
                   {TIPS[tip]}
                 </motion.p>
               </AnimatePresence>
@@ -246,10 +248,10 @@ export function Analysing({
 
             <div className="mt-auto flex items-center justify-between gap-3 border-t border-line pt-4 md:mt-6">
               <p className="text-[11.5px] leading-relaxed text-muted">
-                Your CV is sent for this check only. It is never stored or logged.
+                {a.privacy}
               </p>
               <Button tone="ghost" size="sm" onClick={onCancel} className="shrink-0">
-                Cancel
+                {a.cancel}
               </Button>
             </div>
           </div>

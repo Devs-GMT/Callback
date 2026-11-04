@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { HomeLink } from "@/i18n/link";
 import { cn } from "@/lib/utils";
 
 /**
@@ -159,9 +159,9 @@ export function Wordmark({
   if (href === null) return content;
 
   return (
-    <Link href={href} className="inline-flex rounded-[4px]" aria-label="Callback — home">
+    <HomeLink href={href} className="inline-flex rounded-[4px]">
       {content}
-    </Link>
+    </HomeLink>
   );
 }
 /* -------------------------------------------------------------------------- */

@@ -11,10 +11,11 @@
  */
 
 import { LIMITS } from "@/lib/config";
-import { isAllowedOrigin, jsonError, jsonOk, readJsonBody } from "@/lib/server/http";
+import { isAllowedOrigin, requestLocale, jsonError, jsonOk, readJsonBody } from "@/lib/server/http";
 import { consume, rateLimitHeaders } from "@/lib/server/rate-limit";
 import { extractPage } from "@/lib/server/readability";
 import { safeFetch } from "@/lib/server/safe-fetch";
+import { libMessages } from "@/i18n/lib";
 
 // Runs on the Node.js runtime, which is the default in Next.js 16 and is
 // required here because `safeFetch` resolves DNS with node:dns to check
@@ -34,8 +35,10 @@ export type ExtractUrlResponse = {
 };
 
 export async function POST(request: Request): Promise<Response> {
+  const locale = requestLocale(request);
+  const api = libMessages(locale).api;
   if (!isAllowedOrigin(request)) {
-    return jsonError("bad_request", "This endpoint only serves the Callback app.");
+    return jsonError("bad_request", api.foreignOrigin);
   }
 
   const body = await readJsonBody<{ url?: unknown }>(request, 4096);
@@ -43,16 +46,16 @@ export async function POST(request: Request): Promise<Response> {
 
   const url = typeof body.data.url === "string" ? body.data.url.trim() : "";
   if (url.length === 0) {
-    return jsonError("bad_request", "No link was provided.");
+    return jsonError("bad_request", api.noLink);
   }
   if (url.length > 2048) {
-    return jsonError("bad_request", "That link is too long.");
+    return jsonError("bad_request", api.linkTooLong);
   }
 
   const limit = await consume(request, "extract", DAILY_LIMIT);
   const headers = rateLimitHeaders(limit);
   if (!limit.allowed) {
-    return jsonError("rate_limited", "You've read a lot of links today. Try again tomorrow.", {
+    return jsonError("rate_limited", api.linkRateLimited, {
       retryAfter: limit.resetAfter,
       headers,
     });
@@ -70,49 +73,49 @@ export async function POST(request: Request): Promise<Response> {
       case "bad_url":
         return jsonError(
           "blocked_url",
-          "That doesn't look like a public web link. Paste the text instead.",
+          api.badUrl,
           { headers },
         );
       case "blocked":
         return jsonError(
           "blocked_url",
-          "We can only read public web pages. Paste the text instead.",
+          api.blockedUrl,
           { headers },
         );
       case "dns_failed":
         return jsonError(
           "fetch_failed",
-          "We couldn't find that site. Check the link, or paste the text instead.",
+          api.dnsFailed,
           { headers },
         );
       case "timeout":
         return jsonError(
           "timeout",
-          "That page took too long to respond. Paste the text instead.",
+          api.pageTimeout,
           { headers },
         );
       case "too_large":
-        return jsonError("too_large", "That page is too big to read. Paste the text instead.", {
+        return jsonError("too_large", api.pageTooLarge, {
           headers,
         });
       case "unsupported_type":
         return jsonError(
           "fetch_failed",
-          "That link isn't a web page we can read. Paste the text instead.",
+          api.unsupportedType,
           { headers },
         );
       case "http_error":
         return jsonError(
           "fetch_failed",
           result.failure.status === 401 || result.failure.status === 403
-            ? "That page needs a login, so we can't read it. Paste the text instead."
-            : "We couldn't open that link. Paste the text instead.",
+            ? api.needsLogin
+            : api.httpError,
           { headers },
         );
       default:
         return jsonError(
           "fetch_failed",
-          "We couldn't read this link. Paste the text instead.",
+          api.linkUnreadable,
           { headers },
         );
     }
@@ -127,7 +130,7 @@ export async function POST(request: Request): Promise<Response> {
   if (text.length < 120) {
     return jsonError(
       "fetch_failed",
-      "That page didn't give us any readable text — it may need JavaScript or a login. Paste the text instead.",
+      api.noReadableText,
       { headers },
     );
   }

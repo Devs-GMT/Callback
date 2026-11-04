@@ -1,7 +1,10 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
-import Link from "next/link";
+import { Link } from "@/i18n/link";
+import { useI18n } from "@/i18n/client";
+import { fmt } from "@/i18n/config";
+
 import { ArrowRight, Trash2, TriangleAlert } from "lucide-react";
 import { Card, Eyebrow } from "@/components/ui/card";
 import { Button, ButtonLink } from "@/components/ui/button";
@@ -34,14 +37,6 @@ import { formatDate } from "@/lib/utils";
  * user owns rather than the app — nobody but them knows they got an interview.
  */
 
-const STATUS_LABELS: Record<ApplicationStatus, string> = {
-  "not-applied": "Not applied",
-  applied: "Applied",
-  interview: "Interview",
-  offer: "Offer",
-  callback: "📞 Callback!",
-};
-
 const STATUS_TONES: Record<ApplicationStatus, TagTone> = {
   "not-applied": "neutral",
   applied: "stone",
@@ -65,22 +60,24 @@ export function ApplicationsList() {
     getApplicationsServerSnapshot,
   );
   const [confirmingWipe, setConfirmingWipe] = useState(false);
+  const { locale, t } = useI18n();
+  const a = t.app.applications;
+  const STATUS_LABELS: Record<ApplicationStatus, string> = a.statuses;
 
   return (
     <div className="mx-auto w-full max-w-[1100px] px-4 py-8 sm:px-6 lg:px-10">
       <header className="mb-7 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <Eyebrow className="mb-2">My applications</Eyebrow>
+          <Eyebrow className="mb-2">{a.eyebrow}</Eyebrow>
           <h1 className="display-3 font-serif text-ink">
-            Every job you&apos;ve checked.
+            {a.title}
           </h1>
           <p className="mt-2 max-w-[54ch] text-[13.5px] leading-relaxed text-muted">
-            Saved in this browser only. Update the status as you go — the last
-            one is the one worth having.
+            {a.lede}
           </p>
         </div>
         <ButtonLink href="/app" className="shrink-0">
-          New check
+          {a.newCheck}
         </ButtonLink>
       </header>
 
@@ -91,22 +88,19 @@ export function ApplicationsList() {
             aria-hidden="true"
           />
           <p className="text-[12.5px] leading-relaxed text-ink">
-            This browser is blocking local storage, so your reports can&apos;t be
-            saved between visits. Everything else works — download the report PDF
-            before you close the tab.
+            {a.blocked}
           </p>
         </Card>
       ) : null}
 
       {rows.length === 0 ? (
         <Card surface="sand" className="py-12 text-center" role="status">
-          <p className="font-serif text-[20px] text-ink">No checks yet</p>
+          <p className="font-serif text-[20px] text-ink">{a.emptyTitle}</p>
           <p className="mx-auto mt-2 max-w-[40ch] text-[12.5px] leading-relaxed text-muted">
-            Add your CV and a job, and your report will show up here with its
-            scores.
+            {a.emptyBody}
           </p>
           <ButtonLink href="/app" className="mt-5">
-            Check my CV
+            {a.check}
             <ArrowRight className="size-4" aria-hidden="true" />
           </ButtonLink>
         </Card>
@@ -121,17 +115,17 @@ export function ApplicationsList() {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <h2 className="font-serif text-[17px] leading-snug text-ink">
-                      {row.jobTitle || "Untitled role"}
+                      {row.jobTitle || a.untitled}
                     </h2>
                     {row.stamped ? (
                       <Tag tone="lilac">
                         <ChainGlyph className="text-[11px]" />
-                        Stamped
+                        {a.stamped}
                       </Tag>
                     ) : null}
                   </div>
                   <p className="mt-1 text-[12px] text-muted">
-                    {[row.company, formatDate(row.createdAt)]
+                    {[row.company, formatDate(row.createdAt, locale)]
                       .filter(Boolean)
                       .join(" · ")}
                   </p>
@@ -140,7 +134,7 @@ export function ApplicationsList() {
                 <dl className="flex shrink-0 items-center gap-5">
                   <div>
                     <dt className="text-[10.5px] uppercase tracking-[0.1em] text-muted">
-                      ATS
+                      {a.ats}
                     </dt>
                     <dd className="font-serif text-[20px] tabular-nums text-ink">
                       {row.atsScore}
@@ -148,7 +142,7 @@ export function ApplicationsList() {
                   </div>
                   <div>
                     <dt className="text-[10.5px] uppercase tracking-[0.1em] text-muted">
-                      Match
+                      {a.match}
                     </dt>
                     <dd className="font-serif text-[20px] tabular-nums text-ink">
                       {row.matchScore}%
@@ -158,7 +152,7 @@ export function ApplicationsList() {
 
                 <div className="flex shrink-0 flex-wrap items-center gap-2">
                   <label className="sr-only" htmlFor={`status-${row.reportId}`}>
-                    Status for {row.jobTitle}
+                    {fmt(a.statusFor, { job: row.jobTitle })}
                   </label>
                   <select
                     id={`status-${row.reportId}`}
@@ -185,7 +179,7 @@ export function ApplicationsList() {
                   <Button
                     tone="ghost"
                     size="sm"
-                    aria-label={`Delete the report for ${row.jobTitle}`}
+                    aria-label={fmt(a.delete, { job: row.jobTitle })}
                     onClick={() => deleteReportAndNotify(row.reportId)}
                   >
                     <Trash2 className="size-3.5" aria-hidden="true" />
@@ -200,20 +194,21 @@ export function ApplicationsList() {
       {/* ---------- Privacy controls (PRD section 3) ---------- */}
       <Card surface="sand" className="mt-8 flex flex-col gap-3">
         <div>
-          <Eyebrow className="mb-2">Your data</Eyebrow>
+          <Eyebrow className="mb-2">{a.dataEyebrow}</Eyebrow>
           <p className="text-[12.5px] leading-relaxed text-muted">
             {rows.length === 0
-              ? "Nothing is stored in this browser."
-              : `${rows.length} report${rows.length === 1 ? "" : "s"} stored in this browser, using about ${Math.max(1, Math.round(bytes / 1024))} KB. Nothing is on our servers.`}
+              ? a.nothingStored
+              : fmt(rows.length === 1 ? a.storedOne : a.storedMany, {
+                  count: rows.length,
+                  kb: Math.max(1, Math.round(bytes / 1024)),
+                })}
           </p>
         </div>
 
         {confirmingWipe ? (
           <div className="flex flex-wrap items-center gap-3 rounded-[4px] bg-coral/30 px-3 py-3">
             <p className="min-w-0 flex-1 text-[12.5px] leading-relaxed text-coral-ink">
-              Delete every report and the hash salt from this browser? Stamped
-              reports stay on chain, but you won&apos;t be able to re-derive
-              their CV hash locally. This cannot be undone.
+              {a.wipeConfirm}
             </p>
             <div className="flex shrink-0 gap-2">
               <Button
@@ -223,14 +218,14 @@ export function ApplicationsList() {
                   setConfirmingWipe(false);
                 }}
               >
-                Delete everything
+                {a.wipe}
               </Button>
               <Button
                 tone="ghost"
                 size="sm"
                 onClick={() => setConfirmingWipe(false)}
               >
-                Cancel
+                {a.cancel}
               </Button>
             </div>
           </div>
@@ -243,17 +238,17 @@ export function ApplicationsList() {
             disabled={rows.length === 0}
           >
             <Trash2 className="size-3.5" aria-hidden="true" />
-            Delete all my data
+            {a.deleteAll}
           </Button>
         )}
 
         <p className="text-[11px] leading-relaxed text-muted">
-          Read more in the{" "}
+          {a.readMore}{" "}
           <Link
             href="/#faq"
             className="underline decoration-line underline-offset-2 hover:decoration-ink"
           >
-            FAQ
+            {a.faq}
           </Link>
           .
         </p>

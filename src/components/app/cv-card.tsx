@@ -19,6 +19,9 @@ import {
 } from "@/lib/extract";
 import type { CvInput, ExtractionWarning } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/i18n/client";
+import { fmt } from "@/i18n/config";
+
 
 /**
  * Step 1 of PRD section 2: the three ways to add a CV, plus the preview.
@@ -33,14 +36,6 @@ import { cn } from "@/lib/utils";
 
 type CvTab = "upload" | "paste" | "link";
 
-const WARNING_LABELS: Record<ExtractionWarning, string> = {
-  "two-columns": "Two-column layout",
-  "sparse-text": "Very little text found",
-  tables: "Tables found",
-  images: "Images found",
-  "header-footer": "Details in a header or footer",
-};
-
 export function CvCard({
   value,
   onChange,
@@ -51,6 +46,9 @@ export function CvCard({
   onClear: () => void;
 }) {
   const tabs = useTabs<CvTab>("upload");
+  const { locale, t } = useI18n();
+  const c = t.app.cv;
+  const WARNING_LABELS: Record<ExtractionWarning, string> = c.warnings;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [busy, setBusy] = useState(false);
@@ -86,12 +84,12 @@ export function CvCard({
       try {
         startReview(await extractFromFile(file));
       } catch (caught) {
-        fail(caught, "We couldn't read that file.");
+        fail(caught, c.failFile);
       } finally {
         setBusy(false);
       }
     },
-    [fail, startReview],
+    [fail, startReview, c.failFile],
   );
 
   const handlePaste = useCallback(() => {
@@ -99,9 +97,9 @@ export function CvCard({
     try {
       startReview(extractFromPaste(pasted));
     } catch (caught) {
-      fail(caught, "We couldn't read that text.");
+      fail(caught, c.failText);
     }
-  }, [fail, pasted, startReview]);
+  }, [fail, pasted, startReview, c.failText]);
 
   const handleLink = useCallback(async () => {
     setBusy(true);
@@ -109,11 +107,11 @@ export function CvCard({
     try {
       startReview(await extractFromLink(coerceUrl(link)));
     } catch (caught) {
-      fail(caught, "We couldn't read that link.");
+      fail(caught, c.failLink);
     } finally {
       setBusy(false);
     }
-  }, [fail, link, startReview]);
+  }, [fail, link, startReview, c.failLink]);
 
   /* ------------------------------------------------------------------ */
   /* Confirmed state                                                    */
@@ -123,8 +121,8 @@ export function CvCard({
     return (
       <Card className="flex flex-col gap-4">
         <CardHeader
-          eyebrow="Step 1"
-          title="Your CV"
+          eyebrow={c.step}
+          title={c.title}
           trailing={
             <Button
               tone="ghost"
@@ -137,7 +135,7 @@ export function CvCard({
               }}
             >
               <X className="size-3.5" aria-hidden="true" />
-              Change
+              {c.change}
             </Button>
           }
         />
@@ -146,11 +144,15 @@ export function CvCard({
           <Check className="mt-0.5 size-4 shrink-0 text-mint-ink" aria-hidden="true" />
           <div className="min-w-0 text-[12.5px] leading-relaxed">
             <p className="font-medium text-ink">
-              {value.fileName ?? "CV text added"}
+              {value.fileName ?? c.textAdded}
             </p>
             <p className="text-muted">
-              {value.text.length.toLocaleString("en")} characters
-              {value.pageCount ? ` · ${value.pageCount} page${value.pageCount > 1 ? "s" : ""}` : ""}
+              {fmt(c.characters, { count: value.text.length.toLocaleString(locale) })}
+              {value.pageCount
+                ? value.pageCount > 1
+                  ? fmt(c.pagesMany, { count: value.pageCount })
+                  : c.pagesOne
+                : ""}
             </p>
           </div>
         </div>
@@ -178,9 +180,9 @@ export function CvCard({
     return (
       <Card className="flex flex-col gap-4">
         <CardHeader
-          eyebrow="Step 1"
-          title="Does this look right?"
-          description="This is the text we read. Fix anything that came out wrong — the whole report is based on it."
+          eyebrow={c.step}
+          title={c.reviewTitle}
+          description={c.reviewDescription}
         />
 
         {draft.warnings.length > 0 ? (
@@ -194,7 +196,7 @@ export function CvCard({
         ) : null}
 
         <TextAreaField
-          label="Extracted CV text"
+          label={c.extracted}
           hideLabel
           value={editedText}
           onChange={(event) => setEditedText(event.target.value)}
@@ -212,16 +214,16 @@ export function CvCard({
             disabled={tooShort || editedText.length > LIMITS.cvChars}
           >
             <Check className="size-4" aria-hidden="true" />
-            Looks right
+            {c.looksRight}
           </Button>
           <Button tone="outline" onClick={() => setDraft(null)}>
-            Start over
+            {c.startOver}
           </Button>
         </div>
 
         {tooShort ? (
           <p className="text-[11.5px] text-coral-ink" role="alert">
-            That is too short to score as a CV.
+            {c.tooShort}
           </p>
         ) : null}
       </Card>
@@ -235,19 +237,19 @@ export function CvCard({
   return (
     <Card bare className="flex flex-col">
       <div className="p-5 pb-0">
-        <CardHeader eyebrow="Step 1" title="Your CV" />
+        <CardHeader eyebrow={c.step} title={c.title} />
       </div>
 
       <Tabs
         items={[
-          { id: "upload", label: "Upload" },
-          { id: "paste", label: "Paste text" },
-          { id: "link", label: "Link" },
+          { id: "upload", label: c.tabs.upload },
+          { id: "paste", label: c.tabs.paste },
+          { id: "link", label: c.tabs.link },
         ]}
         value={tabs.value}
         onChange={tabs.setValue}
         idBase={tabs.idBase}
-        label="How to add your CV"
+        label={c.howTo}
         className="mt-4 px-5"
       />
 
@@ -307,10 +309,10 @@ export function CvCard({
 
               <div>
                 <p className="text-[13px] font-medium text-ink">
-                  {busy ? "Reading your CV…" : "Drop your CV here"}
+                  {busy ? c.reading : c.drop}
                 </p>
                 <p className="mt-1 text-[11.5px] text-muted">
-                  PDF or Word (.docx) · up to 5 MB · up to {LIMITS.pdfPages} pages
+                  {fmt(c.limits, { pages: LIMITS.pdfPages })}
                 </p>
               </div>
 
@@ -320,13 +322,12 @@ export function CvCard({
                 onClick={() => fileInputRef.current?.click()}
                 disabled={busy}
               >
-                Choose a file
+                {c.choose}
               </Button>
             </div>
 
             <p className="mt-3 text-[11.5px] leading-relaxed text-muted">
-              Read in your browser. Your CV is only sent to our server for the AI
-              check, and is never stored.
+              {c.browserNote}
             </p>
           </TabPanel>
         ) : null}
@@ -334,10 +335,10 @@ export function CvCard({
         {tabs.value === "paste" ? (
           <TabPanel id="paste" idBase={tabs.idBase}>
             <TextAreaField
-              label="Paste your CV"
+              label={c.pasteLabel}
               value={pasted}
               onChange={(event) => setPasted(event.target.value)}
-              placeholder="Paste the whole thing — summary, experience, education and skills."
+              placeholder={c.pastePlaceholder}
               rows={12}
               limit={LIMITS.cvChars}
             />
@@ -347,7 +348,7 @@ export function CvCard({
               disabled={pasted.trim().length === 0}
             >
               <FileText className="size-4" aria-hidden="true" />
-              Use this text
+              {c.useText}
             </Button>
           </TabPanel>
         ) : null}
@@ -355,13 +356,13 @@ export function CvCard({
         {tabs.value === "link" ? (
           <TabPanel id="link" idBase={tabs.idBase}>
             <TextField
-              label="Link to your CV"
+              label={c.linkLabel}
               type="url"
               inputMode="url"
               value={link}
               onChange={(event) => setLink(event.target.value)}
               placeholder="https://…"
-              hint="A Google Doc published to the web, a public Notion page, or your own site. Pages that need a login can't be read."
+              hint={c.linkHint}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && looksLikeUrl(link)) {
                   event.preventDefault();
@@ -382,7 +383,7 @@ export function CvCard({
               ) : (
                 <Link2 className="size-4" aria-hidden="true" />
               )}
-              {busy ? "Reading…" : "Read this link"}
+              {busy ? c.readingShort : c.readLink}
             </Button>
           </TabPanel>
         ) : null}

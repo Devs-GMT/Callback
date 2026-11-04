@@ -9,6 +9,9 @@
  */
 
 import type { CoverLetter, CoverLetterDraft, CoverLetterParagraph } from "@/lib/types";
+import { LOCALE_TAGS, fmt, type Locale } from "@/i18n/config";
+import { libMessages } from "@/i18n/lib";
+import { detectLanguage } from "@/lib/analysis/language";
 
 const collapse = (value: string) => value.toLowerCase().replace(/[“”"‘’'`]/g, "").replace(/\s+/g, " ").trim();
 
@@ -71,16 +74,37 @@ export function currentLetterText(letter: CoverLetter, candidateName?: string): 
  * line that says what it is about. Kept out of the editable text so a copy
  * pasted into an email starts at the greeting.
  */
+/**
+ * The language a letter is written in. The model writes it in the job's
+ * language, so the date, addressee and subject line around it follow the
+ * letter, not the site.
+ */
+export function letterLanguage(
+  letter: Partial<Pick<CoverLetter, "greeting" | "opening" | "closing">>,
+): Locale {
+  return detectLanguage([letter.greeting, letter.opening, letter.closing].filter(Boolean).join(" "));
+}
+
+/** The date line, written the way the letter's own language writes dates. */
+export function letterDate(time: number, language: Locale): string {
+  return new Intl.DateTimeFormat(LOCALE_TAGS[language], {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(time);
+}
+
 export function letterFrame(
-  letter: Pick<CoverLetter, "options">,
+  letter: Pick<CoverLetter, "options"> & Partial<Pick<CoverLetter, "greeting" | "opening" | "closing">>,
   job: { jobTitle?: string; company?: string },
 ): { recipient: string[]; subject?: string } {
+  const m = libMessages(letterLanguage(letter)).letter;
   const recipient = [
-    letter.options.hiringManager?.trim() || "Hiring Manager",
+    letter.options.hiringManager?.trim() || m.recipient,
     job.company?.trim(),
   ].filter((line): line is string => Boolean(line));
   const role = job.jobTitle?.trim();
-  return { recipient, subject: role ? `Application for the ${role} role` : undefined };
+  return { recipient, subject: role ? fmt(m.subject, { role }) : undefined };
 }
 
 /** Paragraphs of a plain-text letter, for the exporters. */

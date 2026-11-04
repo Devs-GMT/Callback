@@ -18,6 +18,8 @@
 
 import type { Report } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
+import { fmt } from "@/i18n/config";
+import { clientMessages } from "@/i18n/lib";
 
 /* A4 in points, which is jsPDF's default unit for the "a4" format. */
 const PAGE = { width: 595.28, height: 841.89 };
@@ -185,20 +187,21 @@ function statusGlyph(status: "matched" | "partial" | "missing") {
  */
 export async function buildReportPdf(report: Report): Promise<Blob> {
   const { jsPDF } = await import("jspdf");
+  const t = clientMessages().pdf;
 
   const doc = new jsPDF({ unit: "pt", format: "a4", compress: true });
   doc.setProperties({
-    title: `Callback report — ${report.jobTitle}`,
+    title: fmt(t.title, { job: report.jobTitle }),
     creator: "Callback",
-    subject: "CV and job match report",
+    subject: t.subject,
   });
 
   const layout = new Layout(doc);
 
   /* ---------------- header ---------------- */
 
-  layout.eyebrow("Callback report");
-  layout.heading(report.jobTitle || "Untitled role", 20);
+  layout.eyebrow(t.eyebrow);
+  layout.heading(report.jobTitle || t.untitled, 20);
   layout.body(
     [report.company, formatDate(report.createdAt)].filter(Boolean).join(" · "),
     { colour: MUTED },
@@ -209,22 +212,22 @@ export async function buildReportPdf(report: Report): Promise<Blob> {
 
   const hasMatch = report.match.requirements.length > 0;
 
-  layout.eyebrow("Scores");
-  layout.score(String(report.ats.score), "ATS score, out of 100", MARGIN.x);
+  layout.eyebrow(t.scores);
+  layout.score(String(report.ats.score), t.atsScore, MARGIN.x);
   if (hasMatch) {
-    layout.score(`${report.match.score}%`, "Job match", MARGIN.x + 150);
+    layout.score(`${report.match.score}%`, t.jobMatch, MARGIN.x + 150);
   }
   if (report.previousScores) {
     layout.score(
       `${report.previousScores.ats} → ${report.ats.score}`,
-      "After your changes",
+      t.after,
       MARGIN.x + 300,
     );
   }
   layout.endScores();
 
   if (report.match.verdict) {
-    layout.eyebrow("The verdict");
+    layout.eyebrow(t.verdict);
     layout.body(report.match.verdict, { size: 10.5 });
     layout.gap(6);
   }
@@ -233,7 +236,7 @@ export async function buildReportPdf(report: Report): Promise<Blob> {
 
   /* ---------------- ATS ---------------- */
 
-  layout.eyebrow(`ATS check — ${report.ats.score} of 100`);
+  layout.eyebrow(fmt(t.atsHeading, { score: report.ats.score }));
   layout.gap(2);
 
   for (const item of report.ats.items) {
@@ -244,7 +247,7 @@ export async function buildReportPdf(report: Report): Promise<Blob> {
       glyph,
       colour,
       item.label,
-      item.state === "pass" ? item.detail : `${item.detail} Fix: ${item.fix}`,
+      item.state === "pass" ? item.detail : `${item.detail} ${t.fix} ${item.fix}`,
       `${item.earned}/${item.weight}`,
     );
   }
@@ -253,7 +256,7 @@ export async function buildReportPdf(report: Report): Promise<Blob> {
 
   if (hasMatch) {
     layout.rule();
-    layout.eyebrow(`Job match — ${report.match.score}%`);
+    layout.eyebrow(fmt(t.matchHeading, { score: report.match.score }));
     layout.gap(2);
 
     const byId = new Map(report.match.matches.map((m) => [m.requirementId, m]));
@@ -262,27 +265,27 @@ export async function buildReportPdf(report: Report): Promise<Blob> {
       const match = byId.get(requirement.id);
       const status = match?.status ?? "missing";
       const detail = match?.evidence
-        ? `Your CV: "${match.evidence}"`
-        : match?.note || "Not addressed in your CV.";
+        ? fmt(t.yourCv, { quote: match.evidence })
+        : match?.note || t.notAddressed;
 
       layout.row(
         statusGlyph(status),
         statusColour(status),
         requirement.text,
         detail,
-        requirement.type === "must" ? "Must-have" : "Nice-to-have",
+        requirement.type === "must" ? t.mustHave : t.niceToHave,
       );
     }
 
     if (report.match.keywords.missing.length > 0) {
       layout.gap(6);
-      layout.eyebrow("Keywords missing from your CV");
+      layout.eyebrow(t.keywordsMissing);
       layout.body(report.match.keywords.missing.join(" · "), { colour: MUTED });
     }
 
     if (report.match.redFlags.length > 0) {
       layout.gap(6);
-      layout.eyebrow("Watch out for");
+      layout.eyebrow(t.watchOut);
       for (const flag of report.match.redFlags) {
         layout.body(`- ${flag.text}`, { colour: CORAL, indent: 4 });
       }
@@ -297,16 +300,16 @@ export async function buildReportPdf(report: Report): Promise<Blob> {
 
   if (accepted.length > 0) {
     layout.rule();
-    layout.eyebrow(`Changes you accepted — ${accepted.length}`);
+    layout.eyebrow(fmt(t.accepted, { count: accepted.length }));
     layout.gap(2);
 
     for (const suggestion of accepted) {
       layout.body(suggestion.title, { size: 9.5 });
       if (suggestion.before) {
-        layout.body(`Before: ${suggestion.before}`, { colour: CORAL, indent: 12, size: 8.5 });
+        layout.body(`${t.before} ${suggestion.before}`, { colour: CORAL, indent: 12, size: 8.5 });
       }
       if (suggestion.after) {
-        layout.body(`After: ${suggestion.after}`, { colour: MINT, indent: 12, size: 8.5 });
+        layout.body(`${t.afterLabel} ${suggestion.after}`, { colour: MINT, indent: 12, size: 8.5 });
       }
       layout.gap(4);
     }
@@ -321,7 +324,7 @@ export async function buildReportPdf(report: Report): Promise<Blob> {
     doc.setFontSize(7.5);
     doc.setTextColor(...MUTED);
     doc.text(
-      "Scores are computed by Callback and are guidance, not a hiring guarantee. Your CV is never stored.",
+      t.footer,
       MARGIN.x,
       PAGE.height - 30,
     );

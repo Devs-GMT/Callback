@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
-import Link from "next/link";
+import { Link } from "@/i18n/link";
+import { useI18n } from "@/i18n/client";
 import {
   AnimatePresence,
   motion,
@@ -11,6 +12,7 @@ import {
 import { ArrowRight, Menu, X } from "lucide-react";
 import { Wordmark } from "@/components/brand";
 import { ButtonLink } from "@/components/ui/button";
+import { LanguageSwitcher } from "@/components/ui/language-switcher";
 import { EASE_EDITORIAL } from "@/components/motion/primitives";
 import { cn } from "@/lib/utils";
 
@@ -28,14 +30,16 @@ import { cn } from "@/lib/utils";
  * page most visitors will only read. The app's own rail has the real control.
  */
 
-const LINKS = [
-  { href: "/#features", label: "Features" },
-  { href: "/#who", label: "Who it's for" },
-  { href: "/#how", label: "How it works" },
-  { href: "/#faq", label: "FAQ" },
-] as const;
-
 export function Navbar({ surface = "dark" }: { surface?: "dark" | "light" } = {}) {
+  const { t } = useI18n();
+  const n = t.site.nav;
+  const LINKS = [
+    { href: "/#features", label: n.links.features },
+    { href: "/#who", label: n.links.who },
+    { href: "/#how", label: n.links.how },
+    { href: "/#faq", label: n.links.faq },
+  ];
+
   const [scrolled, setScrolled] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -103,7 +107,7 @@ export function Navbar({ surface = "dark" }: { surface?: "dark" | "light" } = {}
         <div className="flex h-16 items-center justify-between gap-6 px-4 md:h-[72px] md:px-7">
           <Wordmark on={dark ? "dark" : "light"} />
 
-          <nav aria-label="Main" className="hidden items-center gap-1.5 lg:flex">
+          <nav aria-label={n.label} className="hidden items-center gap-1.5 lg:flex">
             {LINKS.map((link) => (
               <Link
                 key={link.href}
@@ -128,6 +132,7 @@ export function Navbar({ surface = "dark" }: { surface?: "dark" | "light" } = {}
           </nav>
 
           <div className="hidden items-center gap-5 lg:flex">
+            <LanguageSwitcher on={dark ? "dark" : "light"} />
             <Link
               href="/app"
               className={cn(
@@ -135,10 +140,10 @@ export function Navbar({ surface = "dark" }: { surface?: "dark" | "light" } = {}
                 dark ? "text-white/70 hover:text-white" : "text-muted hover:text-ink",
               )}
             >
-              Connect wallet
+              {n.connectWallet}
             </Link>
             <ButtonLink href="/app" on={dark ? "dark" : "light"} size="lg" className="group">
-              Check my CV
+              {n.checkCv}
               <ArrowRight
                 className="size-3.5 transition-transform duration-300 group-hover:translate-x-0.5"
                 aria-hidden="true"
@@ -149,14 +154,14 @@ export function Navbar({ surface = "dark" }: { surface?: "dark" | "light" } = {}
           {/* ---------- Mobile ---------- */}
           <div className="flex items-center gap-2 lg:hidden">
             <ButtonLink href="/app" on={dark ? "dark" : "light"} size="sm">
-              Check my CV
+              {n.checkCv}
             </ButtonLink>
             <button
               type="button"
               onClick={() => setMenuOpen((open) => !open)}
               aria-expanded={menuOpen}
               aria-controls="site-menu"
-              aria-label={menuOpen ? "Close the menu" : "Open the menu"}
+              aria-label={menuOpen ? n.closeMenu : n.openMenu}
               className={cn(
                 "inline-flex size-11 items-center justify-center rounded-full transition-colors",
                 dark ? "text-white hover:bg-white/10" : "text-ink hover:bg-ink/[0.06]",
@@ -185,7 +190,7 @@ export function Navbar({ surface = "dark" }: { surface?: "dark" | "light" } = {}
           {menuOpen ? (
             <motion.nav
               id="site-menu"
-              aria-label="Main"
+              aria-label={n.label}
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
@@ -193,7 +198,7 @@ export function Navbar({ surface = "dark" }: { surface?: "dark" | "light" } = {}
               className="overflow-hidden border-t border-line lg:hidden"
             >
               <ul className="flex flex-col px-4 py-2">
-                {[...LINKS, { href: "/app", label: "Connect wallet" }].map((link, index) => (
+                {[...LINKS, { href: "/app", label: n.connectWallet }].map((link, index) => (
                   <motion.li
                     key={link.href + link.label}
                     initial={{ opacity: 0, x: -12 }}
@@ -211,6 +216,9 @@ export function Navbar({ surface = "dark" }: { surface?: "dark" | "light" } = {}
                   </motion.li>
                 ))}
               </ul>
+              <div className="border-t border-line px-4 py-3">
+                <LanguageSwitcher variant="list" />
+              </div>
             </motion.nav>
           ) : null}
         </AnimatePresence>

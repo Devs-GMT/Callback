@@ -21,6 +21,10 @@ import type {
 import { computeKeywordCoverage } from "@/lib/analysis/keywords";
 import { guessSeniority, seniorityGap } from "@/lib/analysis/text";
 import { clamp } from "@/lib/utils";
+import { fmt, type Locale } from "@/i18n/config";
+import { libMessages, type LibMessages } from "@/i18n/lib";
+
+type Msg = LibMessages["match"];
 
 export const MATCH_WEIGHTS = {
   must: 60,
@@ -43,6 +47,7 @@ const STATUS_CREDIT: Record<MatchStatus, number> = {
 function verifyEvidence(
   match: RequirementMatch,
   cvHaystack: string,
+  m: Msg,
 ): RequirementMatch {
   if (match.status === "missing") return { ...match, evidence: "" };
 
@@ -52,7 +57,7 @@ function verifyEvidence(
       ...match,
       status: "missing",
       evidence: "",
-      note: match.note || "No supporting evidence found in your CV.",
+      note: match.note || m.noEvidence,
     };
   }
 
@@ -73,7 +78,7 @@ function verifyEvidence(
     ...match,
     status: "missing",
     evidence: "",
-    note: "We couldn't find this in your CV, so we're not counting it.",
+    note: m.notFound,
   };
 }
 
@@ -93,6 +98,7 @@ function buildSeniorityFit(
   reported: AnalyzeResponse["seniority"],
   cvText: string,
   jobText: string,
+  m: Msg,
 ): SeniorityFit {
   // Fall back to the local guess when the model leaves a level unknown.
   const jobLevel: Seniority =
@@ -106,9 +112,9 @@ function buildSeniorityFit(
   let note = reported.note?.trim() ?? "";
   if (note.length === 0) {
     if (jobLevel === "unknown" || cvLevel === "unknown") {
-      note = "We couldn't read a clear seniority level from both sides.";
+      note = m.seniorityUnclear;
     } else if (!mismatch) {
-      note = "Your level looks right for this role.";
+      note = m.seniorityFits;
     } else {
       const jobRank = ["unknown", "intern", "junior", "mid", "senior", "lead"].indexOf(
         jobLevel,
@@ -116,10 +122,8 @@ function buildSeniorityFit(
       const cvRank = ["unknown", "intern", "junior", "mid", "senior", "lead"].indexOf(
         cvLevel,
       );
-      note =
-        cvRank < jobRank
-          ? `This role reads as ${jobLevel} but your CV reads as ${cvLevel} — lead with your most senior work.`
-          : `This role reads as ${jobLevel} but your CV reads as ${cvLevel} — you may be over-qualified, so emphasise fit over scope.`;
+      const levels = { job: m.levels[jobLevel] ?? jobLevel, cv: m.levels[cvLevel] ?? cvLevel };
+      note = fmt(cvRank < jobRank ? m.seniorityUnder : m.seniorityOver, levels);
     }
   }
 
@@ -133,16 +137,18 @@ export function buildMatchReport(
   analysis: AnalyzeResponse,
   cvText: string,
   jobText: string,
+  locale: Locale = "en",
 ): MatchReport {
+  const m = libMessages(locale).match;
   const cvHaystack = cvText.toLowerCase().replace(/\s+/g, " ");
 
   // Keep only matches that point at a real requirement, and verify quotes.
   const requirementIds = new Set(analysis.requirements.map((r) => r.id));
   const verified = analysis.matches
-    .filter((m) => requirementIds.has(m.requirementId))
-    .map((m) => verifyEvidence(m, cvHaystack));
+    .filter((match) => requirementIds.has(match.requirementId))
+    .map((candidate) => verifyEvidence(candidate, cvHaystack, m));
 
-  const byId = new Map(verified.map((m) => [m.requirementId, m]));
+  const byId = new Map(verified.map((match) => [match.requirementId, match]));
 
   // Any requirement the model forgot to judge counts as missing rather than
   // silently dropping out of the denominator.
@@ -152,7 +158,7 @@ export function buildMatchReport(
         requirementId: requirement.id,
         status: "missing",
         evidence: "",
-        note: "Not addressed in your CV.",
+        note: m.notAddressed,
       });
     }
   }
@@ -189,7 +195,7 @@ export function buildMatchReport(
           100,
         );
 
-  const seniority = buildSeniorityFit(analysis.seniority, cvText, jobText);
+  const seniority = buildSeniorityFit(analysis.seniority, cvText, jobText, m);
 
   return {
     score,

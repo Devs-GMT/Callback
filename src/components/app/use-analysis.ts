@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { analyzeFit, ApiCallError, requestPivot } from "@/lib/api/client";
+import { clientMessages, getRuntimeLocale } from "@/i18n/lib";
 import { computeAts } from "@/lib/analysis/ats";
 import { stripInline } from "@/lib/analysis/inline";
 import { buildMatchReport, gapsFrom } from "@/lib/analysis/match";
@@ -114,7 +115,7 @@ export function useAnalysis() {
 
     // Needs nothing from the network, so it is ready before the model is asked
     // anything. This is what makes the `partial` outcome possible.
-    const ruleBasedAts = computeAts(plainCv(cv));
+    const ruleBasedAts = computeAts(plainCv(cv), undefined, getRuntimeLocale());
 
     const baseReport = (
       overrides: Partial<Report> = {},
@@ -166,7 +167,7 @@ export function useAnalysis() {
         report,
         problem:
           apiError?.message ??
-          "We couldn't run the job match. Your ATS check is below.",
+          clientMessages().analysis.matchFailed,
         retryable: apiError?.retryable ?? true,
       });
       return;
@@ -174,8 +175,8 @@ export function useAnalysis() {
 
     // Recompute the ATS score now the model has judged bullet quality, which
     // is the one check PRD section 3 marks as AI-assisted.
-    const ats = computeAts(plainCv(cv), analysis.bulletQuality);
-    const match = buildMatchReport(analysis, stripInline(cv.text), job.text);
+    const ats = computeAts(plainCv(cv), analysis.bulletQuality, getRuntimeLocale());
+    const match = buildMatchReport(analysis, stripInline(cv.text), job.text, getRuntimeLocale());
 
     /* ---------------- the suggestions ---------------- */
 
@@ -204,7 +205,7 @@ export function useAnalysis() {
       if (error instanceof Error && error.name === "AbortError") return;
       const apiError = error instanceof ApiCallError ? error : null;
       pivotProblem =
-        apiError?.message ?? "We couldn't write the suggestions this time.";
+        apiError?.message ?? clientMessages().analysis.pivotFailed;
       pivotRetryable = apiError?.retryable ?? true;
     }
 
@@ -247,8 +248,8 @@ export function useAnalysis() {
           controller.signal,
         );
 
-        const ats = computeAts(plainCv(cv), analysis.bulletQuality);
-        const match = buildMatchReport(analysis, stripInline(cv.text), job.text);
+        const ats = computeAts(plainCv(cv), analysis.bulletQuality, getRuntimeLocale());
+        const match = buildMatchReport(analysis, stripInline(cv.text), job.text, getRuntimeLocale());
 
         setState({ phase: "running", step: "pivot" });
 
@@ -281,7 +282,7 @@ export function useAnalysis() {
         setState({
           phase: "partial",
           report,
-          problem: apiError?.message ?? "The job match failed again.",
+          problem: apiError?.message ?? clientMessages().analysis.matchFailedAgain,
           retryable: apiError?.retryable ?? true,
         });
       }

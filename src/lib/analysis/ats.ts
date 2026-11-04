@@ -32,6 +32,10 @@ import {
   wordCount,
 } from "@/lib/analysis/text";
 import { clamp } from "@/lib/utils";
+import { fmt, type Locale } from "@/i18n/config";
+import { libMessages, type LibMessages } from "@/i18n/lib";
+
+type Msg = LibMessages["ats"];
 
 export const ATS_WEIGHTS = {
   readable: 20,
@@ -68,7 +72,8 @@ function has(warnings: ExtractionWarning[], w: ExtractionWarning) {
 
 /* -------------------------------------------------------------------------- */
 
-function checkReadable(cv: CvInput): AtsCheckItem {
+function checkReadable(cv: CvInput, m: Msg): AtsCheckItem {
+  const r = m.readable;
   const weight = ATS_WEIGHTS.readable;
   const words = wordCount(cv.text);
   const perPage = cv.pageCount ? words / cv.pageCount : words;
@@ -78,13 +83,12 @@ function checkReadable(cv: CvInput): AtsCheckItem {
   if (words < 60) {
     return {
       id: "readable",
-      label: "Text is readable",
+      label: r.label,
       state: "fail",
       earned: 0,
       weight,
-      detail:
-        "We could barely read any text — this looks like a scanned or image-only file.",
-      fix: "Export your CV as a text-based PDF (File → Export as PDF, not a scan) or paste the text instead.",
+      detail: r.scanDetail,
+      fix: r.scanFix,
     };
   }
 
@@ -92,29 +96,35 @@ function checkReadable(cv: CvInput): AtsCheckItem {
     const earned = Math.round(weight * 0.5);
     return {
       id: "readable",
-      label: "Text is readable",
+      label: r.label,
       state: "warn",
       earned,
       weight,
-      detail: `Only ${words} words of text came through${
-        cv.pageCount ? ` across ${cv.pageCount} page${cv.pageCount > 1 ? "s" : ""}` : ""
-      } — some of your CV may be inside images.`,
-      fix: "Check the preview above. If text is missing, re-export as a text-based PDF or paste the text.",
+      detail: fmt(r.sparseDetail, {
+        words,
+        pages: cv.pageCount
+          ? cv.pageCount > 1
+            ? fmt(r.sparsePagesMany, { pages: cv.pageCount })
+            : r.sparsePagesOne
+          : "",
+      }),
+      fix: r.sparseFix,
     };
   }
 
   return {
     id: "readable",
-    label: "Text is readable",
+    label: r.label,
     state: "pass",
     earned: weight,
     weight,
-    detail: `${words} words extracted cleanly — an ATS will be able to parse this.`,
-    fix: "Nothing to fix.",
+    detail: fmt(r.passDetail, { words }),
+    fix: m.nothingToFix,
   };
 }
 
-function checkSections(cv: CvInput): AtsCheckItem {
+function checkSections(cv: CvInput, m: Msg): AtsCheckItem {
+  const s = m.sections;
   const weight = ATS_WEIGHTS.sections;
   const found = detectSections(cv.text);
   const core = (["experience", "education", "skills"] as const).filter(
@@ -124,83 +134,86 @@ function checkSections(cv: CvInput): AtsCheckItem {
   const earned = clamp(core.length * 6 + (found.summary ? 2 : 0), 0, weight);
   const missing = (["experience", "education", "skills"] as const)
     .filter((k) => !found[k])
-    .map((k) => k[0].toUpperCase() + k.slice(1));
+    .map((k) => s.names[k]);
+  const missingList = missing.join(s.and);
 
   const detail =
     missing.length === 0
-      ? `Found Experience, Education and Skills${found.summary ? " and a Summary" : ""}.`
-      : `Missing a clear heading for ${missing.join(" and ")}.`;
+      ? fmt(s.foundAll, { summary: found.summary ? s.foundSummary : "" })
+      : fmt(s.missing, { missing: missingList });
 
   return {
     id: "sections",
-    label: "Standard sections found",
+    label: s.label,
     state: stateFor(earned, weight),
     earned,
     weight,
     detail,
     fix:
       missing.length > 0
-        ? `Add a plain heading for ${missing.join(" and ")} — ATS parsers look for these exact words.`
+        ? fmt(s.fixMissing, { missing: missingList })
         : found.summary
-          ? "Nothing to fix."
-          : 'Add a short "Summary" heading at the top to frame your profile for the role.',
+          ? m.nothingToFix
+          : s.fixSummary,
   };
 }
 
-function checkContact(cv: CvInput): AtsCheckItem {
+function checkContact(cv: CvInput, m: Msg): AtsCheckItem {
+  const k = m.contact;
   const weight = ATS_WEIGHTS.contact;
   const c = detectContact(cv.text);
   const earned =
     (c.email ? 3 : 0) + (c.phone ? 3 : 0) + (c.location ? 2 : 0) + (c.web ? 2 : 0);
 
   const missing: string[] = [];
-  if (!c.email) missing.push("email");
-  if (!c.phone) missing.push("phone");
-  if (!c.location) missing.push("city or location");
-  if (!c.web) missing.push("LinkedIn or portfolio link");
+  if (!c.email) missing.push(k.email);
+  if (!c.phone) missing.push(k.phone);
+  if (!c.location) missing.push(k.location);
+  if (!c.web) missing.push(k.web);
 
   return {
     id: "contact",
-    label: "Contact details present",
+    label: k.label,
     state: stateFor(earned, weight),
     earned,
     weight,
     detail:
       missing.length === 0
-        ? "Email, phone, location and a profile link are all there."
-        : `Couldn't find your ${missing.join(", ")}.`,
+        ? k.allThere
+        : fmt(k.missing, { missing: missing.join(", ") }),
     fix:
       missing.length === 0
-        ? "Nothing to fix."
-        : `Add your ${missing.join(", ")} as plain text near the top — not inside a header, footer or image.`,
+        ? m.nothingToFix
+        : fmt(k.fix, { missing: missing.join(", ") }),
   };
 }
 
-function checkDates(cv: CvInput): AtsCheckItem {
+function checkDates(cv: CvInput, m: Msg): AtsCheckItem {
+  const d = m.dates;
   const weight = ATS_WEIGHTS.dates;
   const dates = detectDates(cv.text);
 
   if (dates.total === 0) {
     return {
       id: "dates",
-      label: "Dates are consistent",
+      label: d.label,
       state: "fail",
       earned: 0,
       weight,
-      detail: "No dates found next to your roles.",
-      fix: 'Add a start and end date to every role, for example "Mar 2023 – Present".',
+      detail: d.noneDetail,
+      fix: d.noneFix,
     };
   }
 
   if (dates.total < 2) {
     return {
       id: "dates",
-      label: "Dates are consistent",
+      label: d.label,
       state: "warn",
       earned: 4,
       weight,
-      detail: "Only one date found — most roles seem to be missing dates.",
-      fix: 'Give every role a start and end date in one format, for example "Jan 2022 – Mar 2024".',
+      detail: d.oneDetail,
+      fix: d.oneFix,
     };
   }
 
@@ -211,44 +224,45 @@ function checkDates(cv: CvInput): AtsCheckItem {
   if (consistent && !yearOnly && dates.hasRanges) {
     return {
       id: "dates",
-      label: "Dates are consistent",
+      label: d.label,
       state: "pass",
       earned: weight,
       weight,
-      detail: `${dates.total} dates, all in one standard format.`,
-      fix: "Nothing to fix.",
+      detail: fmt(d.passDetail, { count: dates.total }),
+      fix: m.nothingToFix,
     };
   }
 
   if (consistent && (yearOnly || !dates.hasRanges)) {
     return {
       id: "dates",
-      label: "Dates are consistent",
+      label: d.label,
       state: "warn",
       earned: 7,
       weight,
-      detail: yearOnly
-        ? "Dates are years only, so an ATS can't tell how long each role lasted."
-        : "Dates are consistent but no date ranges were found.",
-      fix: 'Use month and year ranges, for example "Mar 2023 – Jun 2025".',
+      detail: yearOnly ? d.yearOnlyDetail : d.noRangesDetail,
+      fix: d.rangesFix,
     };
   }
 
   return {
     id: "dates",
-    label: "Dates are consistent",
+    label: d.label,
     state: "warn",
     earned: 5,
     weight,
-    detail: `Mixed date formats found (${Object.entries(dates.counts)
-      .filter(([, n]) => n > 0)
-      .map(([f]) => f.replace("-", " "))
-      .join(", ")}).`,
-    fix: 'Pick one format and use it everywhere — "Mar 2023 – Jun 2025" is the safest.',
+    detail: fmt(d.mixedDetail, {
+      formats: Object.entries(dates.counts)
+        .filter(([, n]) => n > 0)
+        .map(([f]) => d.formats[f] ?? f.replace("-", " "))
+        .join(", "),
+    }),
+    fix: d.mixedFix,
   };
 }
 
-function checkFormatting(cv: CvInput): AtsCheckItem {
+function checkFormatting(cv: CvInput, m: Msg): AtsCheckItem {
+  const f = m.formatting;
   const weight = ATS_WEIGHTS.formatting;
   // Annotated because `ATS_WEIGHTS` is `as const`, which would otherwise infer
   // the literal type 15 here and reject the deductions below.
@@ -258,108 +272,110 @@ function checkFormatting(cv: CvInput): AtsCheckItem {
 
   if (has(cv.warnings, "two-columns")) {
     earned -= 6;
-    problems.push("a two-column layout");
-    fixes.push("switch to a single column — columns get read out of order");
+    problems.push(f.twoColumns);
+    fixes.push(f.twoColumnsFix);
   }
   if (has(cv.warnings, "tables")) {
     earned -= 4;
-    problems.push("tables");
-    fixes.push("replace tables with plain headings and bullet lists");
+    problems.push(f.tables);
+    fixes.push(f.tablesFix);
   }
   if (has(cv.warnings, "images")) {
     earned -= 3;
-    problems.push("images");
-    fixes.push("remove images, icons and photos — their text is invisible to an ATS");
+    problems.push(f.images);
+    fixes.push(f.imagesFix);
   }
   if (has(cv.warnings, "header-footer")) {
     earned -= 2;
-    problems.push("key details inside a header or footer");
-    fixes.push("move contact details into the body of the page");
+    problems.push(f.headerFooter);
+    fixes.push(f.headerFooterFix);
   }
 
   earned = clamp(earned, 0, weight);
 
   return {
     id: "formatting",
-    label: "No formatting risks",
+    label: f.label,
     state: stateFor(earned, weight),
     earned,
     weight,
     detail:
       problems.length === 0
-        ? "Simple single-column layout with no tables or images — ATS-safe."
-        : `Found ${problems.join(", ")}.`,
-    fix: fixes.length === 0 ? "Nothing to fix." : `${fixes.join("; ")}.`,
+        ? f.clean
+        : fmt(f.found, { problems: problems.join(", ") }),
+    fix: fixes.length === 0 ? m.nothingToFix : `${fixes.join("; ")}.`,
   };
 }
 
-function checkLength(cv: CvInput): AtsCheckItem {
+function checkLength(cv: CvInput, m: Msg): AtsCheckItem {
+  const l = m.length;
   const weight = ATS_WEIGHTS.length;
   const words = wordCount(cv.text);
   const pages = cv.pageCount ?? Math.max(1, Math.round(words / WORDS_PER_PAGE));
   const estimated = cv.pageCount === undefined;
-  const suffix = estimated ? " (estimated from the text length)" : "";
+  const suffix = estimated ? l.estimated : "";
 
   if (words < 200) {
     return {
       id: "length",
-      label: "Length is right",
+      label: l.label,
       state: "fail",
       earned: 2,
       weight,
-      detail: `Only ${words} words — this is too short to show what you've done.`,
-      fix: "Aim for one full page: 3 to 5 bullets per recent role, each with a result.",
+      detail: fmt(l.tooShortDetail, { words }),
+      fix: l.tooShortFix,
     };
   }
 
   if (pages <= 2) {
     return {
       id: "length",
-      label: "Length is right",
+      label: l.label,
       state: "pass",
       earned: weight,
       weight,
-      detail: `About ${pages} page${pages > 1 ? "s" : ""}${suffix} — right for most roles.`,
-      fix: "Nothing to fix.",
+      detail: fmt(pages > 1 ? l.passMany : l.passOne, { pages, suffix }),
+      fix: m.nothingToFix,
     };
   }
 
   if (pages === 3) {
     return {
       id: "length",
-      label: "Length is right",
+      label: l.label,
       state: "warn",
       earned: 6,
       weight,
-      detail: `About 3 pages${suffix} — longer than most recruiters read.`,
-      fix: "Cut to 2 pages: drop roles older than 10 years and trim bullets that don't match this job.",
+      detail: fmt(l.threeDetail, { suffix }),
+      fix: l.threeFix,
     };
   }
 
   return {
     id: "length",
-    label: "Length is right",
+    label: l.label,
     state: "fail",
     earned: 2,
     weight,
-    detail: `About ${pages} pages${suffix} — well over the 1 to 2 pages expected.`,
-    fix: "Cut to 2 pages. Keep the last 10 years in detail and compress the rest to one line each.",
+    detail: fmt(l.longDetail, { pages, suffix }),
+    fix: l.longFix,
   };
 }
 
-function checkBullets(cv: CvInput, ai?: BulletQualityInput): AtsCheckItem {
+function checkBullets(cv: CvInput, m: Msg, ai?: BulletQualityInput): AtsCheckItem {
+  const b = m.bullets;
   const weight = ATS_WEIGHTS.bullets;
   const stats = analyseBullets(cv.text);
 
   if (stats.total === 0) {
     return {
       id: "bullets",
-      label: "Bullet quality",
+      label: b.label,
       state: "fail",
       earned: 0,
       weight,
-      detail: "No bullet points found — your experience reads as paragraphs.",
-      fix: "Turn each role into 3 to 5 bullets that start with a verb and end with a result.",
+      detail: b.noneDetail,
+      fix: b.noneFix,
     };
   }
 
@@ -377,22 +393,28 @@ function checkBullets(cv: CvInput, ai?: BulletQualityInput): AtsCheckItem {
     const numberRatio = stats.withNumbers / stats.total;
     // 8 points for strong openers, 7 for quantified results.
     earned = clamp(Math.round(verbRatio * 8 + numberRatio * 7), 0, weight);
-    detail = `${stats.withActionVerb} of ${stats.total} bullets start with an action verb; ${stats.withNumbers} include a number or result.`;
+    detail = fmt(b.ruleDetail, {
+      verbs: stats.withActionVerb,
+      total: stats.total,
+      numbers: stats.withNumbers,
+    });
   }
 
   const weakCount = ai?.weakBullets.length ?? stats.weak.length;
 
   return {
     id: "bullets",
-    label: "Bullet quality",
+    label: b.label,
     state: stateFor(earned, weight),
     earned,
     weight,
     detail,
     fix:
       earned >= weight * 0.85
-        ? "Nothing to fix."
-        : `Rewrite ${weakCount === 1 ? "the weak bullet" : `the ${weakCount} weaker bullets`} to start with a verb and end with a number — see the "What to pivot" tab.`,
+        ? m.nothingToFix
+        : weakCount === 1
+          ? b.fixOne
+          : fmt(b.fixMany, { count: weakCount }),
   };
 }
 
@@ -402,15 +424,20 @@ function checkBullets(cv: CvInput, ai?: BulletQualityInput): AtsCheckItem {
  * Run all seven checks. Pure and synchronous, so the UI can show the ATS tab
  * immediately after extraction and before the AI call returns.
  */
-export function computeAts(cv: CvInput, ai?: BulletQualityInput): AtsReport {
+export function computeAts(
+  cv: CvInput,
+  ai?: BulletQualityInput,
+  locale: Locale = "en",
+): AtsReport {
+  const m = libMessages(locale).ats;
   const items: AtsCheckItem[] = [
-    checkReadable(cv),
-    checkSections(cv),
-    checkContact(cv),
-    checkDates(cv),
-    checkFormatting(cv),
-    checkLength(cv),
-    checkBullets(cv, ai),
+    checkReadable(cv, m),
+    checkSections(cv, m),
+    checkContact(cv, m),
+    checkDates(cv, m),
+    checkFormatting(cv, m),
+    checkLength(cv, m),
+    checkBullets(cv, m, ai),
   ];
 
   const score = clamp(

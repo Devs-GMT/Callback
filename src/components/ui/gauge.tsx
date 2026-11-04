@@ -3,6 +3,7 @@
 import { motion } from "motion/react";
 import { CountUp } from "@/components/motion/primitives";
 import { clamp, cn } from "@/lib/utils";
+import { useI18n } from "@/i18n/client";
 
 /**
  * The score gauges on the report's Overview tab (PRD section 2 step 4).
@@ -31,11 +32,6 @@ const BAND_STROKE: Record<GaugeBand, string> = {
   poor: "#cc6a53",
 };
 
-const BAND_LABEL: Record<GaugeBand, string> = {
-  good: "Strong",
-  fair: "Needs work",
-  poor: "Weak",
-};
 
 export type GaugeProps = {
   /** 0 to 100. */
@@ -59,6 +55,7 @@ export function Gauge({
   on = "light",
   className,
 }: GaugeProps) {
+  const bandLabels = useI18n().t.app.ui.bands;
   const score = clamp(Math.round(value), 0, 100);
   const band = bandFor(score);
 
@@ -133,7 +130,7 @@ export function Gauge({
               on === "dark" ? "text-muted-dark" : "text-muted",
             )}
           >
-            {BAND_LABEL[band]}
+            {bandLabels[band]}
           </span>
         </div>
       </div>

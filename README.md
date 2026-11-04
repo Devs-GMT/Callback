@@ -455,8 +455,9 @@ of any privileged entry point.
 with editor, five templates with PDF and `.docx` export, cover letter, report
 PDF, local history, and on-chain stamping.
 
-**In progress:** Indonesian — CV headings are already recognised; the interface
-is English for now.
+**Languages:** English (default, unprefixed URLs), Indonesian (`/id`) and Malay
+(`/ms`) — the interface, reports, exports, AI feedback and legal pages are
+translated. The English legal text governs if a translation differs.
 
 **Not included, by design:** auto-applying to jobs, scraping LinkedIn,
 recruiter accounts, server-side CV storage, payments, NFTs.

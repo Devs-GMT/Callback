@@ -4,6 +4,8 @@
  */
 
 import type { ApiError, ApiErrorCode } from "@/lib/types";
+import { DEFAULT_LOCALE, isLocale, type Locale } from "@/i18n/config";
+import { libMessages } from "@/i18n/lib";
 
 export function jsonOk<T>(data: T, headers?: Record<string, string>): Response {
   return Response.json(data, {
@@ -89,16 +91,29 @@ export function isAllowedOrigin(request: Request): boolean {
   return /\.vercel\.app$/.test(originHost) && process.env.VERCEL === "1";
 }
 
+/**
+ * The reader's language for this request.
+ *
+ * The app sends it in a header on every call (see `lib/api/client.ts`)
+ * rather than relying on Accept-Language: what matters is the language the
+ * person picked on the site, not their browser's default.
+ */
+export function requestLocale(request: Request): Locale {
+  const value = request.headers.get("x-callback-locale");
+  return isLocale(value) ? value : DEFAULT_LOCALE;
+}
+
 /** Read and size-check a JSON body without trusting Content-Length. */
 export async function readJsonBody<T>(
   request: Request,
   maxBytes: number,
 ): Promise<{ ok: true; data: T } | { ok: false; response: Response }> {
+  const api = libMessages(requestLocale(request)).api;
   const declared = request.headers.get("content-length");
   if (declared && Number(declared) > maxBytes) {
     return {
       ok: false,
-      response: jsonError("too_large", "That request is too large."),
+      response: jsonError("too_large", api.tooLarge),
     };
   }
 
@@ -108,14 +123,14 @@ export async function readJsonBody<T>(
   } catch {
     return {
       ok: false,
-      response: jsonError("bad_request", "We couldn't read that request."),
+      response: jsonError("bad_request", api.unreadableRequest),
     };
   }
 
   if (text.length > maxBytes) {
     return {
       ok: false,
-      response: jsonError("too_large", "That request is too large."),
+      response: jsonError("too_large", api.tooLarge),
     };
   }
 
@@ -124,7 +139,7 @@ export async function readJsonBody<T>(
   } catch {
     return {
       ok: false,
-      response: jsonError("bad_request", "That request wasn't valid JSON."),
+      response: jsonError("bad_request", api.invalidJson),
     };
   }
 }

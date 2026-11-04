@@ -98,6 +98,13 @@
     text-wrap: pretty;
   }
 
+  /* Fieldsets default to `min-inline-size: min-content`, which lets their
+     contents push the whole page wider than the viewport. Every fieldset here
+     is a layout container, so let it shrink and truncate its children. */
+  fieldset {
+    min-width: 0;
+  }
+
   /* A single visible focus treatment, legible on both section colours. */
   :focus-visible {
     outline: 2px solid var(--color-lilac);

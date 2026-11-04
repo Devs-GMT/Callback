@@ -11,6 +11,7 @@ import { letterParagraphs } from "@/lib/analysis/cover-letter";
 import { resolveCvStyle, type CvStyle } from "@/lib/cv-templates";
 import { docxBlocks, docxDocument } from "@/lib/export/cv-docx";
 import { CvPdfWriter, createCvDoc } from "@/lib/export/cv-pdf";
+import { clientMessages } from "@/i18n/lib";
 
 export type LetterExport = {
   /** The CV's layout, for the matching header. */
@@ -30,7 +31,8 @@ export type LetterExport = {
 function title(input: LetterExport): string {
   const who = input.layout.name?.text;
   const role = input.jobTitle ? ` — ${input.jobTitle}` : "";
-  return who ? `${who} — Cover letter${role}` : `Cover letter${role}`;
+  const label = clientMessages().exports.letterTitle;
+  return who ? `${who} — ${label}${role}` : `${label}${role}`;
 }
 
 export async function buildCoverLetterPdf(input: LetterExport): Promise<Blob> {
@@ -83,6 +85,6 @@ export async function buildCoverLetterDocx(input: LetterExport): Promise<Blob> {
     });
   }
 
-  const document = docxDocument(docx, s, title(input), "Cover letter exported from Callback", children);
+  const document = docxDocument(docx, s, title(input), clientMessages().exports.letterSubject, children);
   return docx.Packer.toBlob(document);
 }

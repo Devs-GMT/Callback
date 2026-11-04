@@ -2,6 +2,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { TornPaper, TornPhoto } from "@/components/site/torn-photo";
 import { CountUp, Parallax, Reveal, SplitWords } from "@/components/motion/primitives";
 import personaPhoto from "../../../../public/images/persona-alex.jpg";
+import { getI18n } from "@/i18n/server";
 
 /**
  * Section 4: the sample report story (PRD section 10).
@@ -15,14 +16,15 @@ import personaPhoto from "../../../../public/images/persona-alex.jpg";
  * That honesty is the point. A product that promises never to invent your
  * experience cannot open with an invented customer.
  */
-export function SampleStory() {
+export async function SampleStory() {
+  const sm = (await getI18n()).t.site.sample;
   return (
     <section id="sample" className="section-light relative overflow-hidden pb-20 pt-4 md:py-32">
       <div className="shell grid items-center gap-16 lg:grid-cols-[1.1fr_0.9fr] lg:gap-20">
         {/* ---------- The quote ---------- */}
         <div>
           <Reveal>
-            <p className="eyebrow mb-6">A sample report</p>
+            <p className="eyebrow mb-6">{sm.eyebrow}</p>
           </Reveal>
 
           <blockquote>
@@ -34,9 +36,9 @@ export function SampleStory() {
             </span>
             <SplitWords
               as="p"
-              text="My CV said ‘managed data’. The job asked for ‘SQL dashboards for stakeholders’. Callback showed me the gap — and how to say what I'd actually done."
+              text={sm.quote}
               stagger={0.025}
-              accent={["gap"]}
+              accent={[sm.quoteAccent]}
               accentClassName="italic text-[#8a63d2]"
               className="font-serif text-[clamp(1.5rem,1.05rem+1.9vw,2.4rem)] leading-[1.28] text-ink"
             />
@@ -45,10 +47,10 @@ export function SampleStory() {
               <footer className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-2">
                 <span className="font-script text-[34px] leading-none text-ink">Alex</span>
                 <span className="rounded-[4px] bg-stone px-2 py-[3px] text-[11px] font-medium text-[#5c4f47]">
-                  Sample persona
+                  {sm.persona}
                 </span>
                 <cite className="text-[12.5px] not-italic text-muted">
-                  Junior Data Analyst · not a real customer
+                  {sm.cite}
                 </cite>
               </footer>
             </Reveal>
@@ -57,7 +59,7 @@ export function SampleStory() {
           <Reveal delay={0.2} className="mt-9 rounded-[18px] bg-sand p-6">
             <div className="flex flex-wrap items-end gap-x-8 gap-y-4">
               <div>
-                <p className="eyebrow mb-1.5">Before</p>
+                <p className="eyebrow mb-1.5">{sm.before}</p>
                 <p className="font-serif text-[34px] leading-none text-muted">
                   58<span className="text-[17px]">%</span>
                 </p>
@@ -66,7 +68,7 @@ export function SampleStory() {
                 →
               </span>
               <div>
-                <p className="eyebrow mb-1.5">After three rewrites</p>
+                <p className="eyebrow mb-1.5">{sm.after}</p>
                 <p className="font-serif text-[34px] leading-none text-ink">
                   <CountUp
                     from={58}
@@ -78,15 +80,13 @@ export function SampleStory() {
               </div>
             </div>
             <p className="mt-4 text-[12.5px] leading-relaxed text-muted">
-              Alex accepted three bullet rewrites and a new summary, then
-              re-checked. No new experience was added — the same facts, said in
-              the job&apos;s language.
+              {sm.story}
             </p>
           </Reveal>
 
           <Reveal delay={0.3}>
             <ButtonLink href="/app" tone="outline" size="lg" className="mt-8">
-              Open the sample report
+              {sm.open}
             </ButtonLink>
           </Reveal>
         </div>
@@ -109,7 +109,7 @@ export function SampleStory() {
             <TornPhoto
               id="persona-photo"
               src={personaPhoto}
-              alt="Stock photo illustrating Alex, the sample persona, working at a laptop"
+              alt={sm.photoAlt}
               seed={14}
               amplitude={0.016}
               className="relative aspect-[4/5] w-full rotate-[1.5deg]"
@@ -131,9 +131,9 @@ export function SampleStory() {
             className="absolute -bottom-8 -left-4 right-10 sm:-left-10"
           >
             <div className="animate-float-slow rounded-[14px] border border-line bg-white p-4 shadow-[0_24px_50px_-28px_rgba(0,0,0,0.5)]">
-              <p className="eyebrow mb-1.5">Evidence from the CV</p>
+              <p className="eyebrow mb-1.5">{sm.evidence}</p>
               <p className="text-[13px] italic leading-relaxed text-ink">
-                &ldquo;Built weekly SQL reports for 4 teams&rdquo;{" "}
+                &ldquo;{sm.evidenceQuote}&rdquo;{" "}
                 <span className="not-italic text-mint-ink" aria-hidden="true">
                   ✓
                 </span>
@@ -149,7 +149,7 @@ export function SampleStory() {
               className="animate-float-slower rounded-full bg-espresso px-3.5 py-2 text-[11.5px] font-medium text-white shadow-lg"
               style={{ ["--float-rotate" as string]: "3deg" }}
             >
-              Match 81% ✦
+              {sm.match}
             </div>
           </Reveal>
         </Reveal>

@@ -15,6 +15,9 @@ import {
   looksLikeUrl,
 } from "@/lib/extract";
 import type { JobInput, Seniority } from "@/lib/types";
+import { useI18n } from "@/i18n/client";
+import { fmt } from "@/i18n/config";
+
 
 /**
  * Step 2 of PRD section 2: paste the job description, or give its URL.
@@ -32,14 +35,7 @@ import type { JobInput, Seniority } from "@/lib/types";
 
 type JobTab = "paste" | "url";
 
-const SENIORITY_OPTIONS: Array<{ value: Seniority; label: string }> = [
-  { value: "unknown", label: "Not sure" },
-  { value: "intern", label: "Internship" },
-  { value: "junior", label: "Junior / graduate" },
-  { value: "mid", label: "Mid-level" },
-  { value: "senior", label: "Senior" },
-  { value: "lead", label: "Lead / principal" },
-];
+const SENIORITY_VALUES: Seniority[] = ["unknown", "intern", "junior", "mid", "senior", "lead"];
 
 export function JobCard({
   value,
@@ -50,6 +46,9 @@ export function JobCard({
   onChange: (job: JobInput) => void;
   onClear: () => void;
 }) {
+  const { locale, t } = useI18n();
+  const j = t.app.job;
+  const SENIORITY_OPTIONS = SENIORITY_VALUES.map((value) => ({ value, label: j.seniority[value] }));
   const tabs = useTabs<JobTab>("paste");
 
   const [busy, setBusy] = useState(false);
@@ -79,9 +78,9 @@ export function JobCard({
         seniority: seniority === "unknown" ? job.seniority : seniority,
       });
     } catch (caught) {
-      fail(caught, "We couldn't read that job description.");
+      fail(caught, j.failText);
     }
-  }, [company, fail, onChange, seniority, text, title]);
+  }, [company, fail, onChange, seniority, text, title, j.failText]);
 
   const submitUrl = useCallback(async () => {
     setBusy(true);
@@ -98,11 +97,11 @@ export function JobCard({
         seniority: seniority === "unknown" ? job.seniority : seniority,
       });
     } catch (caught) {
-      fail(caught, "We couldn't read that job link.");
+      fail(caught, j.failLink);
     } finally {
       setBusy(false);
     }
-  }, [fail, onChange, seniority, url]);
+  }, [fail, onChange, seniority, url, j.failLink]);
 
   /* ------------------------------------------------------------------ */
 
@@ -110,8 +109,8 @@ export function JobCard({
     return (
       <Card className="flex flex-col gap-4">
         <CardHeader
-          eyebrow="Step 2"
-          title="The job"
+          eyebrow={j.step}
+          title={j.title}
           trailing={
             <Button
               tone="ghost"
@@ -122,7 +121,7 @@ export function JobCard({
               }}
             >
               <X className="size-3.5" aria-hidden="true" />
-              Change
+              {j.change}
             </Button>
           }
         />
@@ -131,12 +130,12 @@ export function JobCard({
           <Check className="mt-0.5 size-4 shrink-0 text-mint-ink" aria-hidden="true" />
           <div className="min-w-0 text-[12.5px] leading-relaxed">
             <p className="font-medium text-ink">
-              {value.title || "Job description added"}
+              {value.title || j.added}
               {value.company ? ` · ${value.company}` : ""}
             </p>
             <p className="text-muted">
-              {value.text.length.toLocaleString("en")} characters
-              {value.source === "url" ? " · read from the page" : ""}
+              {fmt(j.characters, { count: value.text.length.toLocaleString(locale) })}
+              {value.source === "url" ? j.fromPage : ""}
             </p>
           </div>
         </div>
@@ -147,18 +146,18 @@ export function JobCard({
   return (
     <Card bare className="flex flex-col">
       <div className="p-5 pb-0">
-        <CardHeader eyebrow="Step 2" title="The job" />
+        <CardHeader eyebrow={j.step} title={j.title} />
       </div>
 
       <Tabs
         items={[
-          { id: "paste", label: "Paste the description" },
-          { id: "url", label: "Job URL" },
+          { id: "paste", label: j.tabs.paste },
+          { id: "url", label: j.tabs.url },
         ]}
         value={tabs.value}
         onChange={tabs.setValue}
         idBase={tabs.idBase}
-        label="How to add the job"
+        label={j.howTo}
         className="mt-4 px-5"
       />
 
@@ -166,10 +165,10 @@ export function JobCard({
         {tabs.value === "paste" ? (
           <TabPanel id="paste" idBase={tabs.idBase}>
             <TextAreaField
-              label="Job description"
+              label={j.descriptionLabel}
               value={text}
               onChange={(event) => setText(event.target.value)}
-              placeholder="Paste the full posting, including the requirements and the nice-to-haves."
+              placeholder={j.descriptionPlaceholder}
               rows={10}
               limit={LIMITS.jobChars}
             />
@@ -179,13 +178,13 @@ export function JobCard({
         {tabs.value === "url" ? (
           <TabPanel id="url" idBase={tabs.idBase}>
             <TextField
-              label="Link to the job"
+              label={j.urlLabel}
               type="url"
               inputMode="url"
               value={url}
               onChange={(event) => setUrl(event.target.value)}
               placeholder="https://jobs.example.com/…"
-              hint="Works on most company career pages, including Greenhouse, Lever, Workable and Ashby. LinkedIn blocks reading — paste the text for those."
+              hint={j.urlHint}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && looksLikeUrl(url)) {
                   event.preventDefault();
@@ -206,7 +205,7 @@ export function JobCard({
               ) : (
                 <Link2 className="size-4" aria-hidden="true" />
               )}
-              {busy ? "Reading…" : "Read this job"}
+              {busy ? j.readingShort : j.readJob}
             </Button>
           </TabPanel>
         ) : null}
@@ -214,29 +213,29 @@ export function JobCard({
         {/* Optional details, shared by both tabs. */}
         <details className="group mt-4 border-t border-line pt-4">
           <summary className="flex min-h-11 cursor-pointer list-none items-center text-[12.5px] font-medium text-muted transition-colors hover:text-ink md:min-h-0">
-            Job title, company and level
+            {j.details}
             <span className="ml-2 text-[11px] font-normal text-muted">
-              optional
+              {j.optional}
             </span>
           </summary>
 
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <TextField
-              label="Job title"
+              label={j.titleLabel}
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              placeholder="Product Analyst"
+              placeholder={j.titlePlaceholder}
               maxLength={LIMITS.jobTitleChars}
-              hint={`Up to ${LIMITS.jobTitleChars} characters — this is what gets stamped.`}
+              hint={fmt(j.titleHint, { limit: LIMITS.jobTitleChars })}
             />
             <TextField
-              label="Company"
+              label={j.companyLabel}
               value={company}
               onChange={(event) => setCompany(event.target.value)}
-              placeholder="Acme"
+              placeholder={j.companyPlaceholder}
             />
             <SelectField
-              label="Seniority"
+              label={j.seniorityLabel}
               value={seniority}
               onChange={(event) => setSeniority(event.target.value as Seniority)}
               options={SENIORITY_OPTIONS}
@@ -251,7 +250,7 @@ export function JobCard({
             onClick={submitPaste}
             disabled={text.trim().length === 0}
           >
-            Use this job
+            {j.useJob}
           </Button>
         ) : null}
 

@@ -19,6 +19,7 @@ import {
   requestAccounts,
   switchToActiveChain,
 } from "@/lib/chain/wallet";
+import { clientMessages } from "@/i18n/lib";
 
 /**
  * Wallet state for the whole app.
@@ -130,7 +131,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       setError(
         caught instanceof WalletError
           ? caught.message
-          : "We couldn't connect to your wallet.",
+          : clientMessages().wallet.connectFailed,
       );
     } finally {
       setBusy(false);

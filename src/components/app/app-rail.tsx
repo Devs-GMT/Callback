@@ -1,6 +1,10 @@
 "use client";
 
-import Link from "next/link";
+import { Link } from "@/i18n/link";
+import { useI18n } from "@/i18n/client";
+import { fmt } from "@/i18n/config";
+import { stripLocale } from "@/i18n/config";
+import { LanguageSwitcher } from "@/components/ui/language-switcher";
 import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
 import { ClipboardList, FilePlus2, Home, ShieldCheck } from "lucide-react";
@@ -25,15 +29,17 @@ import { cn } from "@/lib/utils";
  * therefore present in the first paint and never shifts.
  */
 
-const LINKS = [
-  { href: "/app", label: "New check", icon: FilePlus2 },
-  { href: "/app/applications", label: "My applications", icon: ClipboardList },
-] as const;
-
 export function AppRail({ activeHref }: { activeHref: string | null }) {
+  const r = useI18n().t.app.rail;
+  const LINKS = [
+    { href: "/app", label: r.newCheck, icon: FilePlus2 },
+    { href: "/app/applications", label: r.applications, icon: ClipboardList },
+  ];
+  // The pathname carries the locale prefix (`/id/app`); the links do not.
+  const current = activeHref === null ? null : stripLocale(activeHref);
   const isActive = (href: string) => {
-    if (activeHref === null) return false;
-    return href === "/app" ? activeHref === "/app" : activeHref.startsWith(href);
+    if (current === null) return false;
+    return href === "/app" ? current === "/app" : current.startsWith(href);
   };
 
   return (
@@ -52,7 +58,7 @@ export function AppRail({ activeHref }: { activeHref: string | null }) {
         />
         <Wordmark on="dark" />
 
-        <nav aria-label="Callback app" className="mt-8 flex flex-col gap-1">
+        <nav aria-label={r.label} className="mt-8 flex flex-col gap-1">
           {LINKS.map((link) => {
             const Icon = link.icon;
             const active = isActive(link.href);
@@ -91,23 +97,25 @@ export function AppRail({ activeHref }: { activeHref: string | null }) {
           <div className="rounded-[14px] border border-white/10 bg-white/[0.04] p-3.5">
             <p className="mb-1.5 flex items-center gap-1.5 text-[11.5px] font-medium text-white">
               <ShieldCheck className="size-3.5 text-lilac" aria-hidden="true" />
-              Private by design
+              {r.privateTitle}
             </p>
             <p className="text-[11px] leading-relaxed text-muted-dark">
               {IS_CONTRACT_DEPLOYED
-                ? `Stamping writes to ${ACTIVE_CHAIN.name}. Your CV never leaves this browser except for the AI check.`
-                : "Your CV never leaves this browser except for the AI check."}
+                ? fmt(r.privateDeployed, { chain: ACTIVE_CHAIN.name })
+                : r.privatePlain}
             </p>
           </div>
 
           <WalletButton on="dark" />
+
+          <LanguageSwitcher on="dark" className="self-start" />
 
           <Link
             href="/"
             className="inline-flex items-center gap-2 text-[12px] text-muted-dark transition-colors hover:text-white"
           >
             <Home className="size-3.5" aria-hidden="true" />
-            Back to the website
+            {r.back}
           </Link>
         </div>
       </div>
@@ -115,11 +123,14 @@ export function AppRail({ activeHref }: { activeHref: string | null }) {
       {/* ---------- Top bar (below lg) ---------- */}
       <div className="relative z-[2] flex items-center justify-between gap-3 px-4 py-3 lg:hidden">
         <Wordmark on="dark" className="text-[17px]" />
-        <WalletButton on="dark" compact />
+        <div className="flex items-center gap-2">
+          <LanguageSwitcher on="dark" />
+          <WalletButton on="dark" compact />
+        </div>
       </div>
 
       <nav
-        aria-label="Callback app"
+        aria-label={r.label}
         className="hide-scrollbar relative z-[2] flex gap-1 overflow-x-auto border-t border-white/10 px-2 lg:hidden"
       >
         {LINKS.map((link) => {

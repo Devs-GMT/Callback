@@ -20,6 +20,8 @@ import {
 } from "@/lib/config";
 import type { Report, StampInfo } from "@/lib/types";
 import { formatDate, shortAddress } from "@/lib/utils";
+import { useI18n } from "@/i18n/client";
+import { fmt } from "@/i18n/config";
 
 /**
  * Step 6 of PRD section 2: export and stamp.
@@ -49,6 +51,8 @@ export function StampPanel({
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { locale, t } = useI18n();
+  const s = t.report.stamp;
   const [exporting, setExporting] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -102,7 +106,7 @@ export function StampPanel({
       setError(
         caught instanceof WalletError
           ? caught.message
-          : "The transaction failed. Please try again.",
+          : s.failed,
       );
     } finally {
       setBusy(false);
@@ -130,31 +134,34 @@ export function StampPanel({
         <div className="flex items-start justify-between gap-3">
           <div>
             <Eyebrow on="dark" className="mb-2">
-              Stamped on {ACTIVE_CHAIN.name}
+              {fmt(s.stampedOn, { chain: ACTIVE_CHAIN.name })}
             </Eyebrow>
             <p className="font-serif text-[18px] leading-snug text-white">
-              Report #{report.stamp.onChainId}
+              {fmt(s.reportNumber, { id: report.stamp.onChainId })}
             </p>
             <p className="mt-1 text-[12px] leading-relaxed text-muted-dark">
-              {report.jobTitle} · {formatDate(report.stamp.stampedAt)} · Match{" "}
-              {report.match.score}%
+              {fmt(s.summary, {
+                job: report.jobTitle,
+                date: formatDate(report.stamp.stampedAt, locale),
+                score: report.match.score,
+              })}
             </p>
           </div>
           <Tag tone="mint" className="shrink-0">
             <Check className="size-3" aria-hidden="true" />
-            On chain
+            {s.onChain}
           </Tag>
         </div>
 
         <dl className="grid gap-2 border-t border-white/10 pt-3 text-[11.5px]">
           <div className="flex justify-between gap-3">
-            <dt className="text-muted-dark">Stamped by</dt>
+            <dt className="text-muted-dark">{s.stampedBy}</dt>
             <dd className="font-mono text-white">
               {shortAddress(report.stamp.owner)}
             </dd>
           </div>
           <div className="flex justify-between gap-3">
-            <dt className="text-muted-dark">Transaction</dt>
+            <dt className="text-muted-dark">{s.transaction}</dt>
             <dd>
               <a
                 href={explorerTxUrl(report.stamp.txHash)}
@@ -172,15 +179,15 @@ export function StampPanel({
         {shareUrl ? (
           <div className="border-t border-white/10 pt-3">
             <Eyebrow on="dark" className="mb-2">
-              Share this proof
+              {s.share}
             </Eyebrow>
             <p className="mb-2.5 text-[11.5px] leading-relaxed text-muted-dark">
-              Shows only the scores, the job title and the date. Never your CV.
+              {s.shareNote}
             </p>
             <div className="flex flex-wrap gap-2">
               <Button tone="outline" on="dark" size="sm" onClick={() => void copyShare()}>
                 <Copy className="size-3.5" aria-hidden="true" />
-                {copied ? "Copied" : "Copy link"}
+                {copied ? s.copied : s.copyLink}
               </Button>
               <ButtonLink
                 href={`/app?report=${report.stamp.onChainId}`}
@@ -188,7 +195,7 @@ export function StampPanel({
                 on="dark"
                 size="sm"
               >
-                Open it
+                {s.open}
               </ButtonLink>
             </div>
           </div>
@@ -203,7 +210,7 @@ export function StampPanel({
           className="self-start"
         >
           <Download className="size-3.5" aria-hidden="true" />
-          {exporting ? "Building…" : "Download report PDF"}
+          {exporting ? s.building : s.download}
         </Button>
       </Card>
     );
@@ -214,20 +221,19 @@ export function StampPanel({
   /* ------------------------------------------------------------------ */
 
   const stampLabel = (() => {
-    if (busy) return "Confirm in your wallet…";
-    if (wallet.status === "no-wallet") return "Stamp needs MetaMask";
-    if (wallet.status === "wrong-network") return `Switch to ${ACTIVE_CHAIN.name}`;
-    if (wallet.status === "disconnected") return "Connect & stamp";
-    return "Stamp on BOT Chain";
+    if (busy) return s.confirm;
+    if (wallet.status === "no-wallet") return s.needsWallet;
+    if (wallet.status === "wrong-network") return fmt(s.switchTo, { chain: ACTIVE_CHAIN.name });
+    if (wallet.status === "disconnected") return s.connect;
+    return s.stamp;
   })();
 
   return (
     <Card className="flex flex-col gap-4">
       <div>
-        <Eyebrow className="mb-2">Export &amp; stamp</Eyebrow>
+        <Eyebrow className="mb-2">{s.eyebrow}</Eyebrow>
         <p className="text-[13px] leading-relaxed text-muted">
-          Keep a copy of this report, and optionally record your progress on
-          chain.
+          {s.lede}
         </p>
       </div>
 
@@ -238,28 +244,24 @@ export function StampPanel({
         className="self-start"
       >
         <Download className="size-4" aria-hidden="true" />
-        {exporting ? "Building the PDF…" : "Download report PDF"}
+        {exporting ? s.buildingPdf : s.download}
       </Button>
 
       <div className="border-t border-line pt-4">
         <div className="mb-2.5 flex items-center gap-2">
           <ChainGlyph className="text-[15px] text-muted" />
           <h3 className="text-[13px] font-medium text-ink">
-            Stamp your progress
+            {s.progress}
           </h3>
         </div>
 
         <p className="text-[12px] leading-relaxed text-muted">
-          Writes two hashes, your two scores, the job title and today&apos;s
-          date to {ACTIVE_CHAIN.name}. Your name, your CV and its text never go
-          on chain — the CV hash is salted with a random value kept only in this
-          browser, so nobody can work backwards from it.
+          {fmt(s.writes, { chain: ACTIVE_CHAIN.name })}
         </p>
 
         {parentOnChainId ? (
           <p className="mt-2.5 text-[11.5px] leading-relaxed text-muted">
-            Links to report #{parentOnChainId} as a re-check, so the
-            before and after sit together on chain.
+            {fmt(s.links, { id: parentOnChainId })}
           </p>
         ) : null}
 
@@ -287,15 +289,13 @@ export function StampPanel({
           </Button>
         ) : (
           <p className="mt-3.5 rounded-[4px] bg-sand px-3 py-2.5 text-[12px] leading-relaxed text-muted">
-            Stamping turns on once the Callback contract is deployed to{" "}
-            {ACTIVE_CHAIN.name}. Everything else in this report works now.
+            {fmt(s.notDeployed, { chain: ACTIVE_CHAIN.name })}
           </p>
         )}
 
         {wallet.status === "no-wallet" && IS_CONTRACT_DEPLOYED ? (
           <p className="mt-2.5 text-[11.5px] leading-relaxed text-muted">
-            Stamping is the only thing here that needs a wallet. Your report,
-            the exports and your history all work without one.
+            {s.onlyWallet}
           </p>
         ) : null}
 
@@ -310,8 +310,7 @@ export function StampPanel({
       </div>
 
       <p className="border-t border-line pt-3 text-[11px] leading-relaxed text-muted">
-        Scores are computed by Callback, so a stamp proves your progress over
-        time — not that an employer agreed with the score.
+        {s.footnote}
       </p>
     </Card>
   );

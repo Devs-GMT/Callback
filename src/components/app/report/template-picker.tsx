@@ -11,6 +11,7 @@ import {
 } from "@/lib/cv-templates";
 import { cn } from "@/lib/utils";
 import { CvPage } from "./cv-page";
+import { useI18n } from "@/i18n/client";
 
 /**
  * Template, accent and density controls.
@@ -27,10 +28,11 @@ export function TemplatePicker({
   value: CvStyle;
   onChange: (style: CvStyle) => void;
 }) {
+  const tp = useI18n().t.report.templates;
   return (
     <div className="flex flex-col gap-5">
       <fieldset>
-        <legend className="mb-2.5 text-[12px] font-medium text-ink">Template</legend>
+        <legend className="mb-2.5 text-[12px] font-medium text-ink">{tp.template}</legend>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {CV_TEMPLATE_ORDER.map((id) => {
             const template = CV_TEMPLATES[id];
@@ -53,10 +55,10 @@ export function TemplatePicker({
                   <div className="absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-white to-transparent" />
                 </div>
                 <span className="flex items-center justify-between gap-1 px-1 pb-0.5">
-                  <span className="text-[12.5px] font-medium text-ink">{template.label}</span>
+                  <span className="text-[12.5px] font-medium text-ink">{tp.names[id]?.label ?? template.label}</span>
                   {selected ? <Check className="size-3.5 text-ink" aria-hidden="true" /> : null}
                 </span>
-                <span className="px-1 pb-1 text-[11px] leading-snug text-muted">{template.blurb}</span>
+                <span className="px-1 pb-1 text-[11px] leading-snug text-muted">{tp.names[id]?.blurb ?? template.blurb}</span>
               </button>
             );
           })}
@@ -65,7 +67,7 @@ export function TemplatePicker({
 
       <div className="flex flex-wrap items-start gap-x-8 gap-y-4">
         <fieldset>
-          <legend className="mb-2 text-[12px] font-medium text-ink">Accent</legend>
+          <legend className="mb-2 text-[12px] font-medium text-ink">{tp.accent}</legend>
           <div className="flex flex-wrap gap-1">
             {CV_ACCENT_ORDER.map((id) => {
               const accent = CV_ACCENTS[id];
@@ -75,8 +77,8 @@ export function TemplatePicker({
                   key={id}
                   type="button"
                   aria-pressed={selected}
-                  aria-label={accent.label}
-                  title={accent.label}
+                  aria-label={tp.accents[id] ?? accent.label}
+                  title={tp.accents[id] ?? accent.label}
                   onClick={() => onChange({ ...value, accent: id })}
                   className="grid size-11 place-items-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-espresso-btn"
                 >
@@ -96,20 +98,20 @@ export function TemplatePicker({
         </fieldset>
 
         <Toggle
-          legend="Header"
+          legend={tp.header}
           items={[
-            { id: "center", label: "Centred" },
-            { id: "left", label: "Left" },
+            { id: "center", label: tp.centred },
+            { id: "left", label: tp.left },
           ]}
           value={value.header}
           onChange={(header) => onChange({ ...value, header })}
         />
 
         <Toggle
-          legend="Spacing"
+          legend={tp.spacing}
           items={[
-            { id: "normal", label: "Normal" },
-            { id: "compact", label: "Compact" },
+            { id: "normal", label: tp.normal },
+            { id: "compact", label: tp.compact },
           ]}
           value={value.density}
           onChange={(density) => onChange({ ...value, density })}
@@ -141,7 +143,7 @@ function Toggle<T extends string>({
             aria-pressed={value === item.id}
             onClick={() => onChange(item.id)}
             className={cn(
-              "min-h-9 rounded-[4px] px-3.5 text-[12.5px] transition-colors",
+              "min-h-11 rounded-[4px] px-3.5 text-[12.5px] transition-colors md:min-h-9",
               "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-espresso-btn",
               value === item.id ? "bg-white font-medium text-ink shadow-sm" : "text-muted hover:text-ink",
             )}

@@ -16,12 +16,37 @@
  */
 
 import { LIMITS } from "@/lib/config";
+import type { Locale } from "@/i18n/config";
 import type { CoverLetterRequest, PivotRequest } from "@/lib/types";
 
 /** Keep prompt input inside the caps from PRD section 4. */
 function cap(value: string, max: number): string {
   const trimmed = value.trim();
   return trimmed.length <= max ? trimmed : `${trimmed.slice(0, max)}\n[truncated]`;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Language                                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The reader's language, named the way the model understands best.
+ *
+ * Two languages are in play and they must not be confused. Explanations — the
+ * verdict, notes, titles, rationales — are written for the reader, so they
+ * follow the language the site is in. Anything that goes into the CV or the
+ * letter follows the CV or the job: an English CV is never handed back in
+ * Indonesian because the reader browses in Indonesian, and quotes are never
+ * translated, because `buildMatchReport` checks them against the CV verbatim.
+ */
+const READER_LANGUAGE: Record<Locale, string> = {
+  en: "plain British English",
+  id: "plain, natural Indonesian (Bahasa Indonesia), as a careers adviser in Jakarta would write it",
+  ms: "plain, natural Malay (Bahasa Melayu, Malaysian standard), as a careers adviser in Kuala Lumpur would write it",
+};
+
+function languageSection(lines: string[]): string[] {
+  return ["=== LANGUAGE ===", ...lines.map((line) => `- ${line}`), "=== END LANGUAGE ===", ""];
 }
 
 /* -------------------------------------------------------------------------- */
@@ -70,15 +95,21 @@ SANITY CHECKS: set "looksLikeCv" to false if the CV text is not a CV. Set "looks
 
 VERDICT: one paragraph, two or three sentences, addressed to the candidate as "you". Name the real strengths, then the most important gaps, using concrete terms from the job. Example of the tone: "Strong on data skills, missing stakeholder management and SQL depth." No pep talk, no preamble.
 
-Write in plain British English. Return only the JSON object the schema asks for.`;
+LANGUAGE: follow the LANGUAGE section of the request exactly. Return only the JSON object the schema asks for.`;
 
 export function buildAnalyzePrompt(input: {
   cvText: string;
   jobText: string;
   jobTitle?: string;
   seniority?: string;
+  locale?: Locale;
 }): string {
-  const parts: string[] = [];
+  const reader = READER_LANGUAGE[input.locale ?? "en"];
+  const parts: string[] = languageSection([
+    `Write the verdict, every "note", the bullet-quality "detail", red-flag "text" and the seniority "note" in ${reader}.`,
+    "Write each requirement's \"text\" and every keyword in the job description's own language and wording.",
+    "Copy \"evidence\" and \"weakBullets\" from the CV exactly, in whatever language the CV is written in. Never translate a quote.",
+  ]);
 
   if (input.jobTitle?.trim()) {
     parts.push(`Job title given by the user: ${input.jobTitle.trim()}`);
@@ -125,13 +156,17 @@ WHAT TO RETURN — 5 to 9 suggestions, in this priority order:
 STYLE:
 - Titles are short and imperative: "Lead with the SQL dashboard work", not "Suggestion about SQL".
 - Rationales are one line and say what it buys the candidate against this job.
-- Plain British English. No emoji. No flattery.
+- Follow the LANGUAGE section of the request exactly. No emoji. No flattery.
 - Ids are "s1", "s2", "s3" and so on.
 
 Return only the JSON object the schema asks for.`;
 
-export function buildPivotPrompt(input: PivotRequest): string {
-  const parts: string[] = [];
+export function buildPivotPrompt(input: PivotRequest, locale: Locale = "en"): string {
+  const parts: string[] = languageSection([
+    `Write every "title" and "rationale" in ${READER_LANGUAGE[locale]}.`,
+    "Write every \"after\" — rewritten bullets and the summary — in the language the CV itself is written in. Never translate the CV. If the CV mixes languages, use the language of the line being rewritten.",
+    "Copy every \"before\" from the CV exactly. Keywords keep the job description's own wording.",
+  ]);
 
   if (input.jobTitle?.trim()) {
     parts.push(`Target role: ${input.jobTitle.trim()}`);
@@ -182,13 +217,13 @@ NO-INVENTION RULE — this is absolute:
 - If the candidate lacks a requirement, never pretend otherwise. You may address one gap honestly, in a sentence, with what they would bring instead or how they are closing it — but only using facts from the CV.
 
 SHAPE — the structure recruiters expect, in this order:
-- "greeting": "Dear <name>," when a hiring manager's name is given, otherwise "Dear Hiring Manager,".
+- "greeting": in English, "Dear <name>," when a hiring manager's name is given, otherwise "Dear Hiring Manager,". In another language, that language's equivalent (see LANGUAGE).
 - "opening": the hook. Name the role and the company. In the same paragraph, give the candidate's current role or background and years of experience if the CV shows them, and their single strongest match with a concrete result. If the candidate wrote a note about why this company, work it in here in their spirit.
 - "body": each paragraph makes one argument, built like a short story: the job's need, what the candidate did about something similar (employer or project named), how they did it (tools, methods), and the result with the CV's numbers. Then one sentence tying it back to what this role needs. Use the job's own language where the CV supports it.
   - Order the body by what the job cares about most: the strongest must-have first.
   - The last body paragraph may cover how the candidate works — collaboration, ownership, learning fast — but still only with evidence from the CV, and it may address one gap honestly.
 - "closing": restate in one sentence the value the candidate brings to this role, ask for a conversation, and thank the reader. Confident, not grovelling.
-- "signOff": "Kind regards," or "Best regards," or "Sincerely," to suit the tone. Do not add the candidate's name.
+- "signOff": in English, "Kind regards," or "Best regards," or "Sincerely," to suit the tone; in another language, its equivalent (see LANGUAGE). Do not add the candidate's name.
 
 SPECIFICS — what separates a good letter from a generic one:
 - Keep the CV's concrete details. When the CV has a number, a tool, a scale or a result ("40 store managers", "saving 6 hours a month", "cut overstock by 12%"), say it. Paraphrasing it into something vaguer ("reporting tools used by stakeholders") is a failure.
@@ -201,7 +236,7 @@ STYLE:
 - Never describe the job posting itself: no "your requirement for", "the nice-to-have skills in your description", "as listed in the job ad". Just show the fit.
 - Banned openings and phrases: "I am writing to express my interest", "Furthermore", "In addition", "I am excited to apply", "I believe I would be a great fit", "passionate", "dynamic", "synergy", "leverage", "thrilled", "esteemed", "proven track record", "hit the ground running", "In today's fast-paced world", "I am eager to", "this exact", "deep technical capability". Never round or inflate a CV number into a vaguer one ("40 store managers" never becomes "dozens of leaders").
 - No bullet points, no headings, no emoji, no flattery of the company.
-- Write in English, using the spelling the job description uses (British or American).
+- Write the whole letter in the language of the job description, following the LANGUAGE section of the request.
 
 Return only the JSON object the schema asks for.`;
 
@@ -226,6 +261,11 @@ const LENGTHS: Record<CoverLetterRequest["length"], string> = {
 
 export function buildCoverLetterPrompt(input: CoverLetterRequest): string {
   const parts: string[] = [
+    ...languageSection([
+      "Write the letter in the language the job description is written in. For English, use the spelling the job description uses (British or American).",
+      "Use that language's own conventions for the greeting and sign-off. Indonesian: \"Yth. Bapak/Ibu <name>,\" or \"Yth. Tim Rekrutmen,\" and \"Hormat saya,\". Malay: \"Tuan/Puan <name>,\" or \"Tuan/Puan,\" and \"Yang benar,\" or \"Sekian, terima kasih.\". English: as described above.",
+      "Copy every \"evidence\" quote from the CV exactly, in the CV's own language, even if the letter is in another language.",
+    ]),
     `Tone — ${TONES[input.tone]}`,
     `Length — ${LENGTHS[input.length]}`,
   ];

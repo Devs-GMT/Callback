@@ -6,6 +6,8 @@ import { MatchTag, Tag } from "@/components/ui/tag";
 import { MATCH_WEIGHTS } from "@/lib/analysis/match";
 import type { MatchReport, MatchStatus, RequirementCategory } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/i18n/client";
+import { fmt } from "@/i18n/config";
 
 /**
  * The Job match tab (PRD section 2 step 4).
@@ -22,15 +24,6 @@ import { cn } from "@/lib/utils";
  * a table that has to be rebuilt below 768px.
  */
 
-const CATEGORY_LABELS: Record<RequirementCategory, string> = {
-  skill: "Skill",
-  experience: "Experience",
-  education: "Education",
-  language: "Language",
-  certificate: "Certificate",
-  soft: "Soft skill",
-};
-
 const STATUS_ORDER: Record<MatchStatus, number> = {
   missing: 0,
   partial: 1,
@@ -39,6 +32,8 @@ const STATUS_ORDER: Record<MatchStatus, number> = {
 
 export function MatchTab({ report }: { report: MatchReport }) {
   const byId = new Map(report.matches.map((match) => [match.requirementId, match]));
+  const m = useI18n().t.report.match;
+  const CATEGORY_LABELS: Record<RequirementCategory, string> = m.categories;
 
   // Must-haves first, and inside each group the gaps first, because the gaps
   // are the actionable part and should not be buried under what already works.
@@ -56,12 +51,13 @@ export function MatchTab({ report }: { report: MatchReport }) {
     <div className="flex flex-col gap-5">
       {/* ---------- How the score is made up ---------- */}
       <Card>
-        <Eyebrow className="mb-2">How this score works</Eyebrow>
+        <Eyebrow className="mb-2">{m.howTitle}</Eyebrow>
         <p className="text-[13px] leading-relaxed text-muted">
-          Must-haves are {MATCH_WEIGHTS.must}% of the score, nice-to-haves{" "}
-          {MATCH_WEIGHTS.nice}%, and keyword coverage {MATCH_WEIGHTS.keywords}%. A
-          partial match counts for half. Nothing counts without a quote from your
-          CV.
+          {fmt(m.how, {
+            must: MATCH_WEIGHTS.must,
+            nice: MATCH_WEIGHTS.nice,
+            keywords: MATCH_WEIGHTS.keywords,
+          })}
         </p>
 
         {report.seniority.note ? (
@@ -73,7 +69,7 @@ export function MatchTab({ report }: { report: MatchReport }) {
                 : "bg-sand text-muted",
             )}
           >
-            <span className="font-medium">Seniority: </span>
+            <span className="font-medium">{m.seniority}</span>
             {report.seniority.note}
           </p>
         ) : null}
@@ -81,8 +77,8 @@ export function MatchTab({ report }: { report: MatchReport }) {
 
       {/* ---------- Requirements ---------- */}
       {[
-        { label: "Must-haves", items: musts },
-        { label: "Nice-to-haves", items: nices },
+        { label: m.musts, items: musts },
+        { label: m.nices, items: nices },
       ].map((group) =>
         group.items.length === 0 ? null : (
           <section key={group.label}>
@@ -128,7 +124,7 @@ export function MatchTab({ report }: { report: MatchReport }) {
                               {match.evidence}
                             </p>
                             <footer className="mt-1 text-[11px] text-muted">
-                              From your CV
+                              {m.fromCv}
                             </footer>
                           </div>
                         </blockquote>
@@ -151,21 +147,19 @@ export function MatchTab({ report }: { report: MatchReport }) {
       {/* ---------- Keyword coverage ---------- */}
       <section>
         <Eyebrow className="mb-2.5">
-          Keyword coverage ·{" "}
+          {m.keywords} ·{" "}
           {Math.round(report.keywords.ratio * 100)}%
         </Eyebrow>
 
         <Card className="flex flex-col gap-4">
           <p className="text-[12.5px] leading-relaxed text-muted">
-            Terms an automated scan would look for in this job. Matched by text,
-            with common synonyms treated as the same word — &ldquo;JS&rdquo;
-            counts as &ldquo;JavaScript&rdquo;.
+            {m.keywordsLede}
           </p>
 
           {report.keywords.matched.length > 0 ? (
             <div>
               <p className="mb-2 text-[12px] font-medium text-ink">
-                In your CV · {report.keywords.matched.length}
+                {m.inCv} · {report.keywords.matched.length}
               </p>
               <ul className="flex flex-wrap gap-1.5">
                 {report.keywords.matched.map((keyword) => (
@@ -183,7 +177,7 @@ export function MatchTab({ report }: { report: MatchReport }) {
           {report.keywords.missing.length > 0 ? (
             <div>
               <p className="mb-2 text-[12px] font-medium text-ink">
-                Missing · {report.keywords.missing.length}
+                {m.missing} · {report.keywords.missing.length}
               </p>
               <ul className="flex flex-wrap gap-1.5">
                 {report.keywords.missing.map((keyword) => (
@@ -196,9 +190,7 @@ export function MatchTab({ report }: { report: MatchReport }) {
                 ))}
               </ul>
               <p className="mt-2.5 text-[11.5px] leading-relaxed text-muted">
-                Only add a keyword if it is genuinely true of you. The
-                &ldquo;What to pivot&rdquo; tab shows which of these your CV
-                already supports.
+                {m.onlyIfTrue}
               </p>
             </div>
           ) : null}

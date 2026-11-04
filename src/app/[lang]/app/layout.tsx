@@ -2,15 +2,18 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { WalletProvider } from "@/components/app/wallet-context";
 import { AppRail, AppRailLive } from "@/components/app/app-rail";
+import { getI18n } from "@/i18n/server";
 
-export const metadata: Metadata = {
-  title: "Check my CV",
-  description:
-    "Add your CV and a job, and see your ATS score, your match and exactly what to change.",
-  // The app is a private workspace over local data; there is nothing here for
-  // a search engine to index, and a shared report link carries no CV content.
-  robots: { index: false, follow: true },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getI18n();
+  return {
+    title: t.meta.appTitle,
+    description: t.meta.appDescription,
+    // The app is a private workspace over local data; there is nothing here for
+    // a search engine to index, and a shared report link carries no CV content.
+    robots: { index: false, follow: true },
+  };
+}
 
 /**
  * The app shell (PRD section 7).
@@ -20,7 +23,7 @@ export const metadata: Metadata = {
  * becomes a compact top bar, because at that width a fixed side rail costs
  * more horizontal space than the two input cards can spare.
  */
-export default function AppLayout({ children }: LayoutProps<"/app">) {
+export default function AppLayout({ children }: LayoutProps<"/[lang]/app">) {
   return (
     <WalletProvider>
       <div className="flex min-h-dvh flex-col bg-cream lg:flex-row">

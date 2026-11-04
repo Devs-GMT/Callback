@@ -17,6 +17,7 @@ import type {
   PivotRequest,
   PivotResponse,
 } from "@/lib/types";
+import { clientMessages, getRuntimeLocale } from "@/i18n/lib";
 
 export class ApiCallError extends Error {
   code: ApiErrorCode | "network";
@@ -54,7 +55,8 @@ async function post<TBody, TResult>(
   try {
     response = await fetch(path, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      // The reader's language, so errors and explanations come back in it.
+      headers: { "Content-Type": "application/json", "x-callback-locale": getRuntimeLocale() },
       body: JSON.stringify(body),
       signal,
     });
@@ -62,7 +64,7 @@ async function post<TBody, TResult>(
     if (error instanceof Error && error.name === "AbortError") throw error;
     throw new ApiCallError(
       "network",
-      "We couldn't reach the server. Check your connection and try again.",
+      clientMessages().api.network,
     );
   }
 
@@ -75,7 +77,7 @@ async function post<TBody, TResult>(
     }
     throw new ApiCallError(
       payload?.code ?? "upstream_error",
-      payload?.error ?? "Something went wrong. Please try again.",
+      payload?.error ?? clientMessages().api.generic,
       payload?.retryAfter,
     );
   }

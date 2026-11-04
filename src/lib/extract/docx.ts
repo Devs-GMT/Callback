@@ -13,6 +13,7 @@
 
 import { htmlToText } from "@/lib/html-text";
 import type { ExtractionWarning } from "@/lib/types";
+import { clientMessages } from "@/i18n/lib";
 
 export type DocxExtraction = {
   text: string;
@@ -20,7 +21,7 @@ export type DocxExtraction = {
 };
 
 export class DocxUnreadableError extends Error {
-  constructor(message = "We couldn't read this Word file.") {
+  constructor(message = clientMessages().extract.docxUnreadable) {
     super(message);
     this.name = "DocxUnreadableError";
   }
@@ -72,7 +73,7 @@ export async function extractDocx(file: Blob): Promise<DocxExtraction> {
     html = result.value;
   } catch {
     throw new DocxUnreadableError(
-      "We couldn't read this Word file. It may be a .doc rather than a .docx, or damaged.",
+      clientMessages().extract.docxUnreadable,
     );
   }
 

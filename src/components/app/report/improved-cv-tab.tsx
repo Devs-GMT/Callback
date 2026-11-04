@@ -28,6 +28,8 @@ import { CvEditor } from "./cv-editor";
 import { CvPage } from "./cv-page";
 import { SectionsPanel } from "./sections-panel";
 import { TemplatePicker } from "./template-picker";
+import { useI18n } from "@/i18n/client";
+import { fmt } from "@/i18n/config";
 
 /**
  * The Improved CV tab (PRD section 2 step 4).
@@ -69,6 +71,8 @@ export function ImprovedCvTab({
   const structured = useMemo(() => layoutToText(layout), [layout]);
 
   const acceptedCount = countApplied(report.suggestions, report.decisions);
+  const { t } = useI18n();
+  const im = t.report.improved;
 
   const [editing, setEditing] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -152,7 +156,7 @@ export function ImprovedCvTab({
     setExporting(format);
     setExportFailed(false);
     try {
-      const options = { title: `CV — ${report.jobTitle}` };
+      const options = { title: fmt(im.cvTitle, { job: report.jobTitle }) };
       const blob =
         format === "pdf"
           ? await buildCvPdf(shown, style, options)
@@ -171,18 +175,20 @@ export function ImprovedCvTab({
       <Card>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <Eyebrow className="mb-2">Improved CV</Eyebrow>
+            <Eyebrow className="mb-2">{im.eyebrow}</Eyebrow>
             <p className="text-[13px] leading-relaxed text-muted">
               {acceptedCount === 0
-                ? "Accept some suggestions on the “What to pivot” tab and they will appear here, highlighted."
-                : `${acceptedCount} change${acceptedCount === 1 ? "" : "s"} applied. Edit anything you want, then re-check to see the new scores.`}
+                ? im.none
+                : acceptedCount === 1
+                  ? im.appliedOne
+                  : fmt(im.appliedMany, { count: acceptedCount })}
             </p>
           </div>
 
           <div className="flex min-w-0 flex-wrap gap-2">
             <Button tone="outline" size="sm" onClick={() => void copy()}>
               <Copy className="size-3.5" aria-hidden="true" />
-              {copied ? "Copied" : "Copy"}
+              {copied ? im.copied : im.copy}
             </Button>
             <Button
               tone="outline"
@@ -191,7 +197,7 @@ export function ImprovedCvTab({
               disabled={exporting !== null}
             >
               <Download className="size-3.5" aria-hidden="true" />
-              {exporting === "pdf" ? "Building…" : "PDF"}
+              {exporting === "pdf" ? im.building : im.pdf}
             </Button>
             <Button
               tone="outline"
@@ -200,7 +206,7 @@ export function ImprovedCvTab({
               disabled={exporting !== null}
             >
               <Download className="size-3.5" aria-hidden="true" />
-              {exporting === "docx" ? "Building…" : ".docx"}
+              {exporting === "docx" ? im.building : im.docx}
             </Button>
             <Button
               size="sm"
@@ -214,39 +220,37 @@ export function ImprovedCvTab({
                 className={cn("size-3.5", recheckBusy && "animate-spin motion-reduce:animate-none")}
                 aria-hidden="true"
               />
-              {recheckBusy ? "Re-checking…" : "Re-check"}
+              {recheckBusy ? im.rechecking : im.recheck}
             </Button>
           </div>
         </div>
 
         {applied.unapplied.length > 0 ? (
           <p className="mt-4 rounded-[4px] bg-yellow/50 px-3 py-2.5 text-[12px] leading-relaxed text-yellow-ink">
-            {applied.unapplied.length} accepted change
-            {applied.unapplied.length === 1 ? "" : "s"} couldn&apos;t be placed
-            automatically — the original line has probably been edited. Copy
-            them across by hand from the &ldquo;What to pivot&rdquo; tab.
+            {applied.unapplied.length === 1
+              ? im.unappliedOne
+              : fmt(im.unappliedMany, { count: applied.unapplied.length })}
           </p>
         ) : null}
 
         {exportFailed ? (
           <p role="alert" className="mt-4 rounded-[4px] bg-coral/50 px-3 py-2.5 text-[12px] leading-relaxed text-coral-ink">
-            The download couldn&apos;t be built. Try again, or use Copy and paste
-            the text into your own document.
+            {im.exportFailed}
           </p>
         ) : null}
       </Card>
 
       {/* ---------- The CV ---------- */}
       <Card bare>
-        <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-line px-5 py-3">
           <div className="flex flex-wrap items-center gap-2">
             {!editing && acceptedCount > 0 ? (
               <Tag tone="mint">
                 <Sparkles className="size-3" aria-hidden="true" />
-                Changes highlighted
+                {im.highlighted}
               </Tag>
             ) : null}
-            {edited ? <Tag tone="yellow">Edited by you</Tag> : null}
+            {edited ? <Tag tone="yellow">{im.edited}</Tag> : null}
           </div>
 
           <div className="flex shrink-0 flex-wrap justify-end gap-1">
@@ -261,7 +265,7 @@ export function ImprovedCvTab({
                 }}
               >
                 <RotateCcw className="size-3.5" aria-hidden="true" />
-                Undo edits
+                {im.undoEdits}
               </Button>
             ) : null}
             <Button
@@ -271,7 +275,7 @@ export function ImprovedCvTab({
               onClick={() => setShowDesign((open) => !open)}
             >
               <Palette className="size-3.5" aria-hidden="true" />
-              Design
+              {im.design}
             </Button>
             <Button
               tone="ghost"
@@ -289,13 +293,13 @@ export function ImprovedCvTab({
               }}
             >
               <Pencil className="size-3.5" aria-hidden="true" />
-              {editing ? "Done editing" : "Edit"}
+              {editing ? im.doneEditing : im.edit}
             </Button>
           </div>
         </div>
 
         {showDesign ? (
-          <div className="border-b border-line px-5 py-5">
+          <div className="border-b border-line px-4 py-4 sm:px-5 sm:py-5">
             <div className="flex flex-col gap-6">
               <TemplatePicker layout={shown} value={style} onChange={changeStyle} />
               <SectionsPanel
@@ -320,10 +324,7 @@ export function ImprovedCvTab({
       </Card>
 
       <p className="text-[11.5px] leading-relaxed text-muted">
-        Every template is a single column with standard headings, real bullet
-        lists and no tables, images or text boxes — the format an applicant
-        tracking system reads most reliably. Send the PDF unless a job asks
-        for Word.
+        {im.footnote}
       </p>
     </div>
   );

@@ -6,6 +6,8 @@ import { ButtonLink } from "@/components/ui/button";
 import { useActiveBlock } from "@/components/site/use-active-block";
 import { CountUp, EASE_EDITORIAL, Reveal, SplitWords, Tilt } from "@/components/motion/primitives";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/i18n/client";
+
 
 /**
  * Section 2: sticky-scroll "What it does" (PRD section 10).
@@ -65,11 +67,12 @@ function FillBar({
 }
 
 function AtsCard() {
+  const a = useI18n().t.site.whatItDoes.ats;
   return (
     <CardShell>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="eyebrow mb-1.5">ATS check</p>
+          <p className="eyebrow mb-1.5">{a.eyebrow}</p>
           <p className="text-[13px] font-medium text-ink">alex-taylor-cv.pdf</p>
         </div>
         <p className="font-serif text-[34px] leading-none text-ink">
@@ -85,17 +88,17 @@ function AtsCard() {
         {[
           <>
             <span className="text-mint-ink" aria-hidden="true">✓</span>
-            Experience, Education and Skills found
+            {a.sections}
           </>,
           <>
             <span className="text-mint-ink" aria-hidden="true">✓</span>
-            Email, phone and LinkedIn present
+            {a.contact}
           </>,
           <>
             <span className="inline-flex items-center gap-1.5 rounded-[4px] bg-yellow px-2 py-[3px] text-[11px] font-medium text-yellow-ink">
-              <span aria-hidden="true">⚠</span>2-column layout
+              <span aria-hidden="true">⚠</span>{a.twoColumn}
             </span>
-            <span className="text-muted">columns get read out of order</span>
+            <span className="text-muted">{a.twoColumnNote}</span>
           </>,
         ].map((row, index) => (
           <motion.li
@@ -115,17 +118,18 @@ function AtsCard() {
 }
 
 function RequirementCard() {
+  const r = useI18n().t.site.whatItDoes.requirement;
   return (
     <CardShell>
-      <p className="eyebrow mb-3">Job match · requirement 4 of 16</p>
+      <p className="eyebrow mb-3">{r.eyebrow}</p>
 
       <p className="text-[13.5px] leading-snug text-ink">
-        Build and maintain SQL dashboards for non-technical stakeholders
+        {r.text}
       </p>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <span className="rounded-[4px] bg-ink/[0.06] px-2 py-[3px] text-[11px] font-medium text-muted">
-          Must-have
+          {r.mustHave}
         </span>
         <motion.span
           initial={{ opacity: 0, scale: 0.6 }}
@@ -134,13 +138,12 @@ function RequirementCard() {
           transition={{ delay: 0.45, type: "spring", stiffness: 380, damping: 16 }}
           className="inline-flex items-center gap-1.5 rounded-[4px] bg-coral px-2 py-[3px] text-[11px] font-medium text-coral-ink"
         >
-          <span aria-hidden="true">✗</span>Missing
+          <span aria-hidden="true">✗</span>{r.missing}
         </motion.span>
       </div>
 
       <p className="mt-3 rounded-[6px] bg-sand px-3 py-2.5 text-[12px] leading-relaxed text-muted">
-        Your CV says &ldquo;managed data&rdquo; — no quote supports SQL
-        dashboards, so this isn&apos;t counted.
+        {r.note}
       </p>
 
       <div className="mt-3 flex flex-wrap gap-1.5">
@@ -165,17 +168,18 @@ function RequirementCard() {
 }
 
 function RewriteCard() {
+  const w = useI18n().t.site.whatItDoes.rewrite;
   return (
     <CardShell>
-      <p className="eyebrow mb-3">What to pivot · rewrite</p>
+      <p className="eyebrow mb-3">{w.eyebrow}</p>
 
       <div className="overflow-hidden rounded-[6px] border border-line">
         <div className="relative border-b border-line bg-coral/20 px-3 py-2.5">
           <p className="mb-1 text-[10px] font-medium uppercase tracking-[0.1em] text-coral-ink">
-            Before
+            {w.before}
           </p>
           <p className="relative inline text-[12px] leading-relaxed text-ink">
-            Responsible for managing data and reporting
+            {w.beforeText}
             <motion.span
               className="absolute left-0 top-1/2 h-px w-full origin-left bg-coral-ink/60"
               initial={{ scaleX: 0 }}
@@ -194,22 +198,22 @@ function RewriteCard() {
           transition={{ delay: 0.9, duration: 0.7, ease: EASE_EDITORIAL }}
         >
           <p className="mb-1 text-[10px] font-medium uppercase tracking-[0.1em] text-mint-ink">
-            After
+            {w.after}
           </p>
           <p className="text-[12px] leading-relaxed text-ink">
-            Built weekly{" "}
+            {w.afterStart}{" "}
             <mark className="rounded-[2px] bg-lilac-soft px-0.5 text-ink">SQL</mark>{" "}
-            reports for 4 teams, cutting manual reporting by 6 hours a week
+            {w.afterEnd}
           </p>
         </motion.div>
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-3">
         <p className="text-[11.5px] leading-relaxed text-muted">
-          Same facts, the job&apos;s language.
+          {w.note}
         </p>
         <span className="rounded-[4px] bg-espresso px-2.5 py-1 text-[11px] font-medium text-white">
-          Accept
+          {w.accept}
         </span>
       </div>
     </CardShell>
@@ -217,23 +221,24 @@ function RewriteCard() {
 }
 
 function RecheckCard() {
+  const c = useI18n().t.site.whatItDoes.recheck;
   return (
     <CardShell>
       <div className="flex items-center justify-between gap-3">
-        <p className="eyebrow">Re-check</p>
+        <p className="eyebrow">{c.eyebrow}</p>
         <span className="inline-flex items-center gap-1.5 rounded-[4px] bg-mint px-2 py-[3px] text-[11px] font-medium text-mint-ink">
           <span className="relative flex size-1.5">
             <span className="animate-pulse-ring absolute inset-0 rounded-full bg-mint-ink" />
             <span className="relative size-1.5 rounded-full bg-mint-ink" />
           </span>
-          Re-checked
+          {c.rechecked}
         </span>
       </div>
 
       <div className="mt-4 flex flex-col gap-4">
         {[
-          { label: "ATS score", from: 64, to: 88, unit: "" },
-          { label: "Job match", from: 58, to: 81, unit: "%" },
+          { label: c.ats, from: 64, to: 88, unit: "" },
+          { label: c.match, from: 58, to: 81, unit: "%" },
         ].map((row, index) => (
           <div key={row.label}>
             <div className="flex items-baseline justify-between gap-3">
@@ -277,42 +282,15 @@ function RecheckCard() {
 
 /* -------------------------------------------------------------------------- */
 
-const BLOCKS: Block[] = [
-  {
-    label: "ATS check",
-    title: "See what the robot sees",
-    lines:
-      "Seven weighted checks on whether an applicant tracking system can actually read your CV. Every point is accounted for, with a one-line fix.",
-    href: "/app",
-    card: <AtsCard />,
-  },
-  {
-    label: "Job match",
-    title: "Every requirement, with evidence",
-    lines:
-      "We pull the job apart into must-haves and nice-to-haves, then check each one against your CV — and quote the line that proves it.",
-    href: "/app",
-    card: <RequirementCard />,
-  },
-  {
-    label: "What to pivot",
-    title: "Your words, re-angled",
-    lines:
-      "Bullet rewrites in the job's own language, built only from what your CV already says. Keywords you can't back up go in a list you approve.",
-    href: "/app",
-    card: <RewriteCard />,
-  },
-  {
-    label: "Re-check & export",
-    title: "Proof that it worked",
-    lines:
-      "Accept the changes you agree with, re-check, and watch both scores move. Then export the CV as an ATS-friendly .docx.",
-    href: "/app",
-    card: <RecheckCard />,
-  },
-];
+const CARDS = [<AtsCard key="ats" />, <RequirementCard key="req" />, <RewriteCard key="rw" />, <RecheckCard key="rc" />];
 
 export function WhatItDoes() {
+  const w = useI18n().t.site.whatItDoes;
+  const BLOCKS: Block[] = w.blocks.map((block, index) => ({
+    ...block,
+    href: "/app",
+    card: CARDS[index],
+  }));
   const { active, register } = useActiveBlock(BLOCKS.length);
 
   return (
@@ -326,11 +304,11 @@ export function WhatItDoes() {
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div>
             <Reveal>
-              <p className="eyebrow eyebrow-on-dark mb-4">What it does</p>
+              <p className="eyebrow eyebrow-on-dark mb-4">{w.eyebrow}</p>
             </Reveal>
             <SplitWords
-              text="Callback works your application end-to-end, from CV to apply."
-              accent={["end-to-end,"]}
+              text={w.title}
+              accent={[w.titleAccent]}
               className="display-2 max-w-[18ch] font-serif text-white"
             />
           </div>
@@ -392,7 +370,7 @@ export function WhatItDoes() {
                     size="sm"
                     className="mt-6"
                   >
-                    Learn more
+                    {w.learnMore}
                   </ButtonLink>
                 </Reveal>
 

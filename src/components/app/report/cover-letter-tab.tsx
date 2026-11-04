@@ -11,7 +11,9 @@ import { layoutCv, layoutText, layoutToText, withoutSections } from "@/lib/analy
 import { stripInline } from "@/lib/analysis/inline";
 import {
   currentLetterText,
+  letterDate,
   letterFrame,
+  letterLanguage,
   letterParagraphs,
   letterWordCount,
 } from "@/lib/analysis/cover-letter";
@@ -30,6 +32,8 @@ import type {
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { CvHeader, CvSheet, pt } from "./cv-page";
+import { useI18n } from "@/i18n/client";
+import { fmt } from "@/i18n/config";
 
 /**
  * The Cover letter tab.
@@ -40,20 +44,10 @@ import { CvHeader, CvSheet, pt } from "./cv-page";
  * nothing was made up. It uses the CV's template, so the two match.
  */
 
-const TONES: Array<{ id: CoverLetterTone; label: string }> = [
-  { id: "professional", label: "Professional" },
-  { id: "warm", label: "Warm" },
-  { id: "confident", label: "Confident" },
-];
+const TONES: CoverLetterTone[] = ["professional", "warm", "confident"];
 
-const LENGTHS: Array<{ id: CoverLetterLength; label: string }> = [
-  { id: "short", label: "Short" },
-  { id: "standard", label: "Standard" },
-  { id: "detailed", label: "Detailed" },
-];
+const LENGTHS: CoverLetterLength[] = ["short", "standard", "detailed"];
 
-const letterDate = (time: number) =>
-  new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" }).format(time);
 
 export function CoverLetterTab({
   report,
@@ -81,6 +75,8 @@ export function CoverLetterTab({
   const [style] = useState<CvStyle>(() => loadCvStyle());
 
   const letter = report.coverLetter;
+  const l = useI18n().t.report.letter;
+  const language = letter ? letterLanguage(letter) : "en";
   const [options, setOptions] = useState<CoverLetterOptions>(
     () => letter?.options ?? { tone: "professional", length: "standard" },
   );
@@ -131,7 +127,7 @@ export function CoverLetterTab({
     } catch (caught) {
       if (caught instanceof Error && caught.name === "AbortError") return;
       setError(
-        caught instanceof ApiCallError ? caught.message : "Writing the letter failed. Please try again.",
+        caught instanceof ApiCallError ? caught.message : l.failed,
       );
     } finally {
       if (abort.current === controller) setBusy(false);
@@ -157,14 +153,14 @@ export function CoverLetterTab({
         layout,
         text,
         style,
-        date: letterDate(letter.createdAt),
+        date: letterDate(letter.createdAt, language),
         jobTitle: report.jobTitle,
         ...letterFrame(letter, report),
       };
       const blob = format === "pdf" ? await buildCoverLetterPdf(input) : await buildCoverLetterDocx(input);
       downloadBlob(blob, cvFilename(report.jobTitle, format, "cover-letter"));
     } catch {
-      setError("The download couldn't be built. Try again, or use Copy.");
+      setError(l.exportFailed);
     } finally {
       setExporting(null);
     }
@@ -182,32 +178,30 @@ export function CoverLetterTab({
     <div className="flex flex-col gap-5">
       {/* ---------- Options ---------- */}
       <Card>
-        <Eyebrow className="mb-2">Cover letter</Eyebrow>
+        <Eyebrow className="mb-2">{l.eyebrow}</Eyebrow>
         <p className="mb-5 max-w-[62ch] text-[13px] leading-relaxed text-muted">
-          Written from your improved CV and the requirements you already match.
-          Every paragraph is backed by a line from your CV, and nothing is said
-          about the company that isn&apos;t in the job post or your own note.
+          {l.lede}
         </p>
 
         <div className="flex flex-col gap-4">
           <div className="flex flex-wrap gap-x-8 gap-y-4">
             <Segmented
-              legend="Tone"
-              items={TONES}
+              legend={l.tone}
+              items={TONES.map((id) => ({ id, label: l.tones[id] }))}
               value={options.tone}
               onChange={(tone) => setOptions({ ...options, tone })}
             />
             <Segmented
-              legend="Length"
-              items={LENGTHS}
+              legend={l.length}
+              items={LENGTHS.map((id) => ({ id, label: l.lengths[id] }))}
               value={options.length}
               onChange={(length) => setOptions({ ...options, length })}
             />
           </div>
 
           <TextField
-            label="Hiring manager (optional)"
-            hint="Leave empty for “Dear Hiring Manager”."
+            label={l.manager}
+            hint={l.managerHint}
             value={options.hiringManager ?? ""}
             maxLength={LIMITS.hiringManagerChars}
             onChange={(event) => setOptions({ ...options, hiringManager: event.target.value })}
@@ -215,8 +209,8 @@ export function CoverLetterTab({
           />
 
           <TextAreaField
-            label="Why this company? (optional)"
-            hint="In your own words, a sentence or two. It's the only thing the letter will say about the company beyond the job post."
+            label={l.why}
+            hint={l.whyHint}
             value={options.motivation ?? ""}
             limit={LIMITS.motivationChars}
             rows={3}
@@ -230,14 +224,14 @@ export function CoverLetterTab({
               ) : (
                 <PenLine className="size-3.5" aria-hidden="true" />
               )}
-              {busy ? "Writing…" : letter ? "Write a new version" : "Write my cover letter"}
+              {busy ? l.writing : letter ? l.newVersion : l.write}
             </Button>
             {busy ? (
               <span className="text-[12px] text-muted" aria-live="polite">
-                Usually 15 to 30 seconds.
+                {l.duration}
               </span>
             ) : letter?.editedText && !busy ? (
-              <span className="text-[12px] text-muted">A new version replaces your edits.</span>
+              <span className="text-[12px] text-muted">{l.replaces}</span>
             ) : null}
           </div>
 
@@ -255,26 +249,26 @@ export function CoverLetterTab({
           <Card bare>
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[12px] tabular-nums text-muted">{words} words</span>
-                {letter.editedText ? <Tag tone="yellow">Edited by you</Tag> : null}
+                <span className="text-[12px] tabular-nums text-muted">{fmt(l.words, { count: words })}</span>
+                {letter.editedText ? <Tag tone="yellow">{l.edited}</Tag> : null}
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button tone="outline" size="sm" onClick={() => void copy()} disabled={editing}>
                   <Copy className="size-3.5" aria-hidden="true" />
-                  {copied ? "Copied" : "Copy"}
+                  {copied ? l.copied : l.copy}
                 </Button>
                 <Button tone="outline" size="sm" onClick={() => void download("pdf")} disabled={editing || exporting !== null}>
                   <Download className="size-3.5" aria-hidden="true" />
-                  {exporting === "pdf" ? "Building…" : "PDF"}
+                  {exporting === "pdf" ? l.building : "PDF"}
                 </Button>
                 <Button tone="outline" size="sm" onClick={() => void download("docx")} disabled={editing || exporting !== null}>
                   <Download className="size-3.5" aria-hidden="true" />
-                  {exporting === "docx" ? "Building…" : ".docx"}
+                  {exporting === "docx" ? l.building : ".docx"}
                 </Button>
                 {letter.editedText && !editing ? (
                   <Button tone="ghost" size="sm" onClick={() => onChange({ ...letter, editedText: undefined })}>
                     <RotateCcw className="size-3.5" aria-hidden="true" />
-                    Undo edits
+                    {l.undoEdits}
                   </Button>
                 ) : null}
                 <Button
@@ -289,7 +283,7 @@ export function CoverLetterTab({
                   }}
                 >
                   <Pencil className="size-3.5" aria-hidden="true" />
-                  {editing ? "Done editing" : "Edit"}
+                  {editing ? l.doneEditing : l.edit}
                 </Button>
               </div>
             </div>
@@ -297,12 +291,12 @@ export function CoverLetterTab({
             <div className="bg-sand/60 p-3 sm:p-6">
               {editing ? (
                 <TextAreaField
-                  label="Your cover letter"
+                  label={l.yourLetter}
                   hideLabel
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
                   rows={22}
-                  hint="Keep a blank line between paragraphs."
+                  hint={l.blankLine}
                 />
               ) : (
                 <CvSheet style={style}>
@@ -310,7 +304,7 @@ export function CoverLetterTab({
                     <>
                       <CvHeader s={s} name={layout.name} headline={layout.headline} lines={layout.contact} />
                       <p style={{ marginTop: pt(s.space.section), fontSize: pt(s.size.small), color: "#555555" }}>
-                        {letterDate(letter.createdAt)}
+                        {letterDate(letter.createdAt, language)}
                       </p>
                       <div style={{ marginTop: pt(s.space.section * 0.6) }}>
                         {frame.recipient.map((line, index) => (
@@ -343,10 +337,11 @@ export function CoverLetterTab({
 
 /** Each body paragraph next to the CV lines it rests on. */
 function EvidenceList({ letter }: { letter: CoverLetter }) {
+  const backed = useI18n().t.report.letter.backed;
   if (letter.body.length === 0) return null;
   return (
     <Card>
-      <Eyebrow className="mb-3">Backed by your CV</Eyebrow>
+      <Eyebrow className="mb-3">{backed}</Eyebrow>
       <ol className="flex flex-col gap-4">
         {letter.body.map((paragraph, index) => (
           <li key={index} className="flex flex-col gap-2">

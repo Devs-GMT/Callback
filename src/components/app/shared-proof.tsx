@@ -11,6 +11,9 @@ import { fetchOnChainReport } from "@/lib/chain/wallet";
 import { ACTIVE_CHAIN, IS_CONTRACT_DEPLOYED } from "@/lib/config";
 import type { OnChainReport } from "@/lib/chain/abi";
 import { formatDate, shortAddress } from "@/lib/utils";
+import { useI18n } from "@/i18n/client";
+import { fmt } from "@/i18n/config";
+
 
 /**
  * A stamped report, opened from a share link (`?report=31`).
@@ -30,6 +33,8 @@ export function SharedProof({ id }: { id: string }) {
     | { phase: "missing" }
     | { phase: "unavailable" }
   >({ phase: "loading" });
+  const { locale, t } = useI18n();
+  const p = t.app.proof;
 
   useEffect(() => {
     let cancelled = false;
@@ -79,7 +84,7 @@ export function SharedProof({ id }: { id: string }) {
           aria-hidden="true"
         />
         <p className="mt-3 text-[13px] text-muted">
-          Reading report #{id} from {ACTIVE_CHAIN.name}…
+          {fmt(p.loading, { id, chain: ACTIVE_CHAIN.name })}
         </p>
       </Card>
     );
@@ -88,13 +93,12 @@ export function SharedProof({ id }: { id: string }) {
   if (state.phase === "unavailable") {
     return (
       <Card surface="sand" className="mx-auto max-w-[520px] text-center">
-        <p className="font-serif text-[20px] text-ink">Proof links aren&apos;t live yet</p>
+        <p className="font-serif text-[20px] text-ink">{p.unavailableTitle}</p>
         <p className="mx-auto mt-2 max-w-[42ch] text-[12.5px] leading-relaxed text-muted">
-          The Callback contract hasn&apos;t been deployed to {ACTIVE_CHAIN.name}{" "}
-          yet, so stamped reports can&apos;t be looked up.
+          {fmt(p.unavailableBody, { chain: ACTIVE_CHAIN.name })}
         </p>
         <ButtonLink href="/app" className="mt-5">
-          Check my CV
+          {p.check}
         </ButtonLink>
       </Card>
     );
@@ -103,13 +107,12 @@ export function SharedProof({ id }: { id: string }) {
   if (state.phase === "missing") {
     return (
       <Card surface="sand" className="mx-auto max-w-[520px] text-center">
-        <p className="font-serif text-[20px] text-ink">Report not found</p>
+        <p className="font-serif text-[20px] text-ink">{p.missingTitle}</p>
         <p className="mx-auto mt-2 max-w-[42ch] text-[12.5px] leading-relaxed text-muted">
-          There&apos;s no report #{id} on {ACTIVE_CHAIN.name}. The link may be
-          mistyped, or the report may have been stamped on a different network.
+          {fmt(p.missingBody, { id, chain: ACTIVE_CHAIN.name })}
         </p>
         <ButtonLink href="/app" className="mt-5">
-          Check my own CV
+          {p.checkOwn}
         </ButtonLink>
       </Card>
     );
@@ -121,12 +124,12 @@ export function SharedProof({ id }: { id: string }) {
   return (
     <div className="mx-auto max-w-[620px]">
       <header className="mb-5 text-center">
-        <Eyebrow className="mb-2">Verified on {ACTIVE_CHAIN.name}</Eyebrow>
+        <Eyebrow className="mb-2">{fmt(p.verified, { chain: ACTIVE_CHAIN.name })}</Eyebrow>
         <h1 className="display-3 font-serif text-ink">
-          {report.jobTitle || "Untitled role"}
+          {report.jobTitle || p.untitled}
         </h1>
         <p className="mt-2 text-[13px] text-muted">
-          Report #{id} · {formatDate(stampedAt)}
+          {fmt(p.reportLine, { id, date: formatDate(stampedAt, locale) })}
         </p>
       </header>
 
@@ -134,35 +137,39 @@ export function SharedProof({ id }: { id: string }) {
         <div className="flex flex-wrap items-center justify-center gap-10">
           <Gauge
             value={report.atsScore}
-            label="ATS score"
-            caption={parent ? `was ${parent.atsScore}` : "out of 100"}
+            label={p.atsScore}
+            caption={parent ? fmt(p.was, { value: parent.atsScore }) : p.outOf}
           />
           <Gauge
             value={report.matchScore}
-            label="Job match"
+            label={p.jobMatch}
             unit="%"
-            caption={parent ? `was ${parent.matchScore}%` : "against this job"}
+            caption={parent ? fmt(p.was, { value: `${parent.matchScore}%` }) : p.againstJob}
           />
         </div>
 
         {parent ? (
           <p className="rounded-[4px] bg-mint/35 px-3 py-2.5 text-center text-[12.5px] leading-relaxed text-mint-ink">
-            Re-checked after changes: ATS {parent.atsScore} → {report.atsScore} ·
-            Match {parent.matchScore}% → {report.matchScore}%
+            {fmt(p.rechecked, {
+              fromAts: parent.atsScore,
+              toAts: report.atsScore,
+              fromMatch: parent.matchScore,
+              toMatch: report.matchScore,
+            })}
           </p>
         ) : null}
 
         <dl className="grid gap-2 border-t border-line pt-4 text-[12px]">
           <div className="flex justify-between gap-3">
-            <dt className="text-muted">Stamped by</dt>
+            <dt className="text-muted">{p.stampedBy}</dt>
             <dd className="font-mono text-ink">{shortAddress(report.owner)}</dd>
           </div>
           <div className="flex justify-between gap-3">
-            <dt className="text-muted">Report hash</dt>
+            <dt className="text-muted">{p.reportHash}</dt>
             <dd className="font-mono text-ink">{shortAddress(report.reportHash, 10, 6)}</dd>
           </div>
           <div className="flex justify-between gap-3">
-            <dt className="text-muted">CV hash</dt>
+            <dt className="text-muted">{p.cvHash}</dt>
             <dd className="font-mono text-ink">{shortAddress(report.cvHash, 10, 6)}</dd>
           </div>
         </dl>
@@ -170,7 +177,7 @@ export function SharedProof({ id }: { id: string }) {
         <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
           <Tag tone="lilac">
             <ChainGlyph className="text-[12px]" />
-            On chain
+            {p.onChain}
           </Tag>
           <ButtonLink
             href={`${ACTIVE_CHAIN.explorerUrl}/address/${report.owner}`}
@@ -178,20 +185,17 @@ export function SharedProof({ id }: { id: string }) {
             tone="outline"
             size="sm"
           >
-            View on explorer
+            {p.explorer}
             <ExternalLink className="size-3.5" aria-hidden="true" />
           </ButtonLink>
           <ButtonLink href="/app" size="sm" className="ml-auto">
-            Check my own CV
+            {p.checkOwn}
           </ButtonLink>
         </div>
       </Card>
 
       <p className="mt-5 text-center text-[11.5px] leading-relaxed text-muted">
-        This proof shows only the scores, the job title and the date. No CV
-        content is stored on chain, and the CV hash is salted with a value kept
-        only in its owner&apos;s browser. Scores are computed by Callback and are
-        guidance, not a hiring guarantee.
+        {p.note}
       </p>
     </div>
   );

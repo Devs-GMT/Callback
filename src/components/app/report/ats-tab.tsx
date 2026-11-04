@@ -5,6 +5,8 @@ import { CheckGlyph } from "@/components/ui/tag";
 import { ATS_WEIGHTS } from "@/lib/analysis/ats";
 import type { AtsReport } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/i18n/client";
+import { fmt } from "@/i18n/config";
 
 /**
  * The ATS check tab (PRD section 2 step 4): a checklist with a ✓ / ⚠ / ✗ and
@@ -17,16 +19,16 @@ import { cn } from "@/lib/utils";
  */
 export function AtsTab({ report }: { report: AtsReport }) {
   const totalWeight = Object.values(ATS_WEIGHTS).reduce((sum, w) => sum + w, 0);
+  const a = useI18n().t.report.ats;
 
   return (
     <div className="flex flex-col gap-5">
       <Card>
         <div className="flex items-baseline justify-between gap-4">
           <div>
-            <Eyebrow className="mb-2">ATS check</Eyebrow>
+            <Eyebrow className="mb-2">{a.eyebrow}</Eyebrow>
             <p className="text-[13px] leading-relaxed text-muted">
-              How well an applicant tracking system can read your CV. Scored by
-              rules, not opinion — every point is accounted for below.
+              {a.lede}
             </p>
           </div>
           <p className="shrink-0 font-serif text-[26px] leading-none tabular-nums text-ink">
@@ -71,7 +73,7 @@ export function AtsTab({ report }: { report: AtsReport }) {
 
               {item.state !== "pass" ? (
                 <div className="rounded-[4px] bg-sand px-3 py-2.5 pl-3">
-                  <Eyebrow className="mb-1">The fix</Eyebrow>
+                  <Eyebrow className="mb-1">{a.fix}</Eyebrow>
                   <p className="text-[12.5px] leading-relaxed text-ink">{item.fix}</p>
                 </div>
               ) : null}
@@ -81,7 +83,7 @@ export function AtsTab({ report }: { report: AtsReport }) {
               <div
                 className="h-1 w-full overflow-hidden rounded-full bg-ink/[0.07]"
                 role="img"
-                aria-label={`${item.earned} of ${item.weight} points`}
+                aria-label={fmt(a.points, { earned: item.earned, weight: item.weight })}
               >
                 <div
                   className={cn(
@@ -101,8 +103,7 @@ export function AtsTab({ report }: { report: AtsReport }) {
       </ul>
 
       <p className="text-[11.5px] leading-relaxed text-muted">
-        Scores are guidance, not a hiring guarantee. Different systems read CVs
-        differently — these checks cover what most of them have in common.
+        {a.footnote}
       </p>
     </div>
   );

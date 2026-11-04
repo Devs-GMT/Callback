@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { Link } from "@/i18n/link";
+import { useI18n } from "@/i18n/client";
+import { fmt } from "@/i18n/config";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { ArrowUpRight } from "lucide-react";
 import { ChainGlyph } from "@/components/brand";
@@ -24,21 +26,26 @@ import { cn } from "@/lib/utils";
  * personal data. So it names exactly what goes on chain.
  */
 
-const STATUSES = [
-  { label: "Not applied", className: "bg-ink/[0.06] text-muted" },
-  { label: "Applied", className: "bg-lilac-soft text-[#5b3d99]" },
-  { label: "Interview", className: "bg-yellow text-yellow-ink" },
-  { label: "Offer", className: "bg-peach text-coral-ink" },
-  { label: "📞 Callback!", className: "bg-mint text-mint-ink" },
+const STATUS_CLASSES = [
+  "bg-ink/[0.06] text-muted",
+  "bg-lilac-soft text-[#5b3d99]",
+  "bg-yellow text-yellow-ink",
+  "bg-peach text-coral-ink",
+  "bg-mint text-mint-ink",
 ] as const;
 
 function StatusCycle() {
+  const labels = useI18n().t.site.tracker.statuses;
+  const STATUSES = STATUS_CLASSES.map((className, index) => ({
+    label: labels[index],
+    className,
+  }));
   const [index, setIndex] = useState(0);
   const reduce = useReducedMotion();
 
   useEffect(() => {
     if (reduce) return;
-    const timer = setInterval(() => setIndex((value) => (value + 1) % STATUSES.length), 1600);
+    const timer = setInterval(() => setIndex((value) => (value + 1) % STATUS_CLASSES.length), 1600);
     return () => clearInterval(timer);
   }, [reduce]);
 
@@ -86,11 +93,12 @@ function StatusCycle() {
 }
 
 function BeforeAfterMini() {
+  const k = useI18n().t.site.tracker;
   return (
     <div className="flex flex-col gap-3 rounded-[10px] bg-white p-3.5" aria-hidden="true">
       {[
-        { label: "ATS", from: 64, to: 88 },
-        { label: "Match", from: 58, to: 81 },
+        { label: k.ats, from: 64, to: 88 },
+        { label: k.match, from: 58, to: 81 },
       ].map((row, index) => (
         <div key={row.label}>
           <div className="mb-1.5 flex justify-between text-[11px]">
@@ -113,13 +121,14 @@ function BeforeAfterMini() {
         </div>
       ))}
       <div className="mt-1 rounded-[6px] bg-mint/30 px-2.5 py-2 text-[11px] leading-snug text-ink">
-        <span className="text-mint-ink">+ </span>Built weekly <b className="font-medium">SQL</b> reports for 4 teams
+        <span className="text-mint-ink">+ </span>{k.builtStart} <b className="font-medium">SQL</b> {k.builtEnd}
       </div>
     </div>
   );
 }
 
 function StampSeal() {
+  const seal = useI18n().t.site.tracker.seal;
   return (
     <div className="relative mx-auto flex size-[150px] items-center justify-center" aria-hidden="true">
       <svg viewBox="0 0 150 150" className="animate-spin-slow absolute inset-0 size-full text-ink/55">
@@ -128,7 +137,7 @@ function StampSeal() {
         </defs>
         <text className="fill-current text-[10.5px] uppercase tracking-[0.32em]">
           <textPath href="#seal-circle">
-            Stamped on {ACTIVE_CHAIN.name} · no personal data ·
+            {fmt(seal, { chain: ACTIVE_CHAIN.name })}
           </textPath>
         </text>
       </svg>
@@ -145,42 +154,48 @@ function StampSeal() {
   );
 }
 
-const CARDS = [
+export function Tracker() {
+  const k = useI18n().t.site.tracker;
+  const CARDS: Array<{
+    title: string;
+    body: string;
+    visual: React.ReactNode;
+    detail?: string;
+    span: string;
+    surface: string;
+  }> = [
   {
-    title: "Match history",
-    body: "Every job you checked, with its ATS score, its match percentage and the date. Saved in your browser, not on a server.",
+    ...k.cards.history,
     visual: <StatusCycle />,
     span: "md:col-span-2 lg:col-span-1",
     surface: "bg-sand",
   },
   {
-    title: "Before / after",
-    body: "See every change you accepted, the bullet it replaced, and what the re-check did to both scores.",
+    ...k.cards.beforeAfter,
     visual: <BeforeAfterMini />,
     span: "",
     surface: "bg-sand",
   },
   {
-    title: "Proof on BOT Chain",
-    body: `Optionally stamp a report on ${ACTIVE_CHAIN.name}. Two salted hashes, two scores, the job title and a date — no name, no email, no CV text.`,
+    title: k.cards.proof.title,
+    body: fmt(k.cards.proof.body, { chain: ACTIVE_CHAIN.name }),
     visual: <StampSeal />,
-    detail: "Needs a wallet. Nothing else here does.",
+    detail: k.cards.proof.detail,
     span: "",
     surface: "bg-stone/70",
   },
-];
+  ];
 
-export function Tracker() {
   return (
     <section className="section-light pb-20 md:pb-32">
       <div className="shell">
         <div className="max-w-[46ch]">
           <Reveal>
-            <p className="eyebrow mb-4">Your application tracker</p>
+            <p className="eyebrow mb-4">{k.eyebrow}</p>
           </Reveal>
           <SplitWords
-            text="Keep every application in one place."
-            accent={["one"]}
+            text={k.title}
+            accent={[k.titleAccent]}
             accentClassName="italic text-[#8a63d2]"
             className="display-2 font-serif text-ink"
           />
@@ -214,13 +229,13 @@ export function Tracker() {
               href="/app/applications"
               className="group inline-flex items-center gap-1 font-medium text-ink underline decoration-line underline-offset-4 transition-colors hover:decoration-ink"
             >
-              Open my applications
+              {k.open}
               <ArrowUpRight
                 className="size-3.5 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
                 aria-hidden="true"
               />
             </Link>{" "}
-            — or delete everything in one click, any time.
+            {k.deleteNote}
           </p>
         </Reveal>
       </div>

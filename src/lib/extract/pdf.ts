@@ -16,6 +16,7 @@
  */
 
 import type { ExtractionWarning } from "@/lib/types";
+import { clientMessages } from "@/i18n/lib";
 
 export type PdfExtraction = {
   text: string;
@@ -33,7 +34,7 @@ export class PdfTooManyPagesError extends Error {
 }
 
 export class PdfUnreadableError extends Error {
-  constructor(message = "We couldn't read this PDF.") {
+  constructor(message = clientMessages().extract.pdfUnreadable) {
     super(message);
     this.name = "PdfUnreadableError";
   }
@@ -313,7 +314,7 @@ export async function extractPdf(
   } catch {
     await loadingTask.destroy().catch(() => undefined);
     throw new PdfUnreadableError(
-      "We couldn't open this PDF. It may be password-protected or damaged.",
+      clientMessages().extract.pdfLocked,
     );
   }
 
