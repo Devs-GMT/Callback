@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { motion } from "motion/react";
 import { EASE_EDITORIAL } from "@/components/motion/primitives";
 import { Check, Copy, ExternalLink } from "lucide-react";
-import { ChainGlyph, TornPaperEdge, Wordmark } from "@/components/brand";
+import { TornPaperEdge, Wordmark } from "@/components/brand";
+import botChainLogo from "../../../public/images/botchain-logo.png";
 import { fetchStats } from "@/lib/chain/wallet";
 import {
   ACTIVE_CHAIN,
@@ -145,8 +147,8 @@ export function SiteFooter() {
             rel="noopener noreferrer"
             className="group flex items-center gap-3"
           >
-            <span className="flex size-12 shrink-0 items-center justify-center rounded-full border border-line bg-sand text-ink transition-colors group-hover:border-ink/40">
-              <ChainGlyph className="text-[19px]" />
+            <span className="flex size-12 shrink-0 items-center justify-center rounded-full border border-line bg-white transition-colors group-hover:border-ink/40">
+              <Image src={botChainLogo} alt="BOT Chain logo" className="size-7" />
             </span>
             <span className="text-[12px] leading-tight">
               <span className="block font-medium text-ink">Built on BOT Chain</span>
@@ -284,7 +286,8 @@ export function SiteFooter() {
       </div>
 
       {/* ---------- Torn paper edge ---------- */}
-      <TornPaperEdge className="absolute inset-x-0 bottom-0" height={56} />
+      {/* PRD section 13: the torn edge scales down on mobile. */}
+      <TornPaperEdge className="absolute inset-x-0 bottom-0 h-8! md:h-14!" height={56} />
     </footer>
   );
 }

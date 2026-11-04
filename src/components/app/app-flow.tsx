@@ -3,7 +3,7 @@
 import { useCallback, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
 import { useSearchParams } from "next/navigation";
-import { ArrowRight, Check, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ShieldCheck } from "lucide-react";
 import { Card, Eyebrow } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CvCard } from "@/components/app/cv-card";
@@ -32,14 +32,28 @@ function Phase({ children, className }: { children: ReactNode; className?: strin
   );
 }
 
+/** Which input screen is showing below 768px, where the start screen is split into steps. */
+type MobileStep = "cv" | "job";
+
 /** CV → Job → Report, lit up as the inputs arrive. */
-function Stepper({ cvDone, jobDone }: { cvDone: boolean; jobDone: boolean }) {
+function Stepper({
+  cvDone,
+  jobDone,
+  mobileStep,
+}: {
+  cvDone: boolean;
+  jobDone: boolean;
+  mobileStep: MobileStep;
+}) {
   const steps = [
-    { label: "Your CV", done: cvDone },
-    { label: "The job", done: jobDone },
-    { label: "Your report", done: false },
+    { label: "Your CV", short: "CV", done: cvDone },
+    { label: "The job", short: "Job", done: jobDone },
+    { label: "Your report", short: "Report", done: false },
   ];
-  const activeIndex = !cvDone ? 0 : !jobDone ? 1 : 2;
+  // `mobileStep` only leaves "cv" through the mobile Next button, so on wider
+  // screens this is the plain "first unfinished input" rule.
+  const activeIndex =
+    cvDone && jobDone ? 2 : mobileStep === "job" ? 1 : !cvDone ? 0 : 1;
 
   return (
     <ol className="flex items-center gap-2" aria-label="Progress">
@@ -69,7 +83,10 @@ function Stepper({ cvDone, jobDone }: { cvDone: boolean; jobDone: boolean }) {
                 <span className="font-serif text-[12px]">{index + 1}</span>
               )}
             </span>
-            <span className="hidden sm:inline">{step.label}</span>
+            <span className="whitespace-nowrap">
+              <span className="sm:hidden">{step.short}</span>
+              <span className="hidden sm:inline">{step.label}</span>
+            </span>
           </span>
           {index < steps.length - 1 ? (
             <span className="relative h-px w-6 overflow-hidden bg-line sm:w-10" aria-hidden="true">
@@ -107,6 +124,12 @@ export function AppFlow() {
 
   const [cv, setCv] = useState<CvInput | null>(null);
   const [job, setJob] = useState<JobInput | null>(null);
+  const [mobileStep, setMobileStep] = useState<MobileStep>("cv");
+
+  const goToStep = useCallback((step: MobileStep) => {
+    setMobileStep(step);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
 
   /**
    * The report is derived from the analysis state rather than mirrored into
@@ -226,6 +249,7 @@ export function AppFlow() {
               setEdits(null);
               setCv(null);
               setJob(null);
+              setMobileStep("cv");
               analysis.setState({ phase: "idle" });
             }}
           >
@@ -261,11 +285,27 @@ export function AppFlow() {
             your own CV, and exactly what to change.
           </p>
         </div>
-        <Stepper cvDone={cv !== null} jobDone={job !== null} />
+        <Stepper cvDone={cv !== null} jobDone={job !== null} mobileStep={mobileStep} />
       </header>
 
       {/* PRD section 7: the two input cards sit side by side on the start
-          screen from 1280px, and stack below that. */}
+          screen from 1280px, and stack below that. PRD section 8: below 768px
+          they become separate step screens, CV first, then the job. */}
+      {mobileStep === "job" ? (
+        <div className="mb-4 flex items-center justify-between gap-3 md:hidden">
+          <Button tone="ghost" size="sm" className="-ml-3" onClick={() => goToStep("cv")}>
+            <ArrowLeft className="size-4" aria-hidden="true" />
+            Back to your CV
+          </Button>
+          {cv ? (
+            <span className="flex min-w-0 items-center gap-1.5 text-[12px] text-mint-ink">
+              <Check className="size-3.5 shrink-0" aria-hidden="true" />
+              <span className="truncate">{cv.fileName ?? "CV added"}</span>
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="grid gap-5 xl:grid-cols-2">
         {[
           <CvCard key="cv" value={cv} onChange={setCv} onClear={() => setCv(null)} />,
@@ -276,14 +316,39 @@ export function AppFlow() {
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.1 + index * 0.1, ease: EASE_EDITORIAL }}
-            className="[&>*]:h-full [&>*]:shadow-[0_24px_50px_-40px_rgba(28,16,9,0.45)]"
+            className={cn(
+              "[&>*]:h-full [&>*]:shadow-[0_24px_50px_-40px_rgba(28,16,9,0.45)]",
+              card.key !== mobileStep && "max-md:hidden",
+            )}
           >
             {card}
           </motion.div>
         ))}
       </div>
 
-      <div className="mt-7 flex flex-wrap items-center gap-4">
+      {mobileStep === "cv" ? (
+        <div className="mt-7 flex flex-col gap-3 md:hidden">
+          <Button
+            size="lg"
+            disabled={cv === null}
+            className="w-full"
+            onClick={() => goToStep("job")}
+          >
+            Next: the job
+            <ArrowRight className="size-4" aria-hidden="true" />
+          </Button>
+          {cv === null ? (
+            <p className="text-center text-[12.5px] text-muted">Add your CV to continue.</p>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div
+        className={cn(
+          "mt-7 flex flex-wrap items-center gap-4",
+          mobileStep === "cv" && "max-md:hidden",
+        )}
+      >
         <Magnetic strength={ready ? 0.2 : 0}>
           <span className="relative inline-flex">
             {ready ? (
